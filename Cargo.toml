@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "balter-core",
+    "balter-macros",
+    "mock-service",
+    "examples-dir",
+]
+exclude = [
+    "playground"
+]
+
+resolver = "2"

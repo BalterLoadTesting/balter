@@ -1,0 +1,23 @@
+[package]
+name = "balter-macros"
+license = "MIT"
+version = "0.1.2"
+edition = "2021"
+readme = "README.md"
+authors = ["Byron Wasti <github@byronwasti.com>"]
+homepage = "https://github.com/byronwasti/balter"
+repository = "https://github.com/byronwasti/balter"
+description = "A load/stress testing framework."
+keywords = ["testing", "distributed", "load-testing"]
+categories = ["development-tools", "concurrency"]
+publish = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.63"
+quote = "1.0.29"
+syn = { version="2.0.23", features=["full"] }
