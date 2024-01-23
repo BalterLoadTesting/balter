@@ -266,6 +266,7 @@ dependencies = [
  "axum 0.7.2",
  "balter-macros",
  "bincode",
+ "cfg_eval",
  "clap",
  "futures-util",
  "governor",
@@ -300,6 +301,19 @@ name = "base64"
 version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "604178f6c5c21f02dc555784810edfb88d34ac2c73b2eae109655649ee73ce3d"
+
+[[package]]
+name = "basic-examples"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "balter",
+ "linkme",
+ "reqwest",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "bincode"
@@ -363,6 +377,17 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
+name = "cfg_eval"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45565fc9416b9896014f5732ac776f810ee53a66730c17e4020c3ec064a8f88f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "chrono"
@@ -551,6 +576,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "distributed-examples"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "balter",
+ "linkme",
+ "reqwest",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -584,19 +622,6 @@ checksum = "958e4d70b6d5e81971bebec42271ec641e7ff4e170a6fa605f2b8a8b65cb97d3"
 dependencies = [
  "event-listener",
  "pin-project-lite",
-]
-
-[[package]]
-name = "examples-dir"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "balter",
- "linkme",
- "reqwest",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

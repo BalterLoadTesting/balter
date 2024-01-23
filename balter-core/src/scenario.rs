@@ -30,7 +30,7 @@ pub(crate) type BoxedFut = Pin<Box<dyn Future<Output = ()> + Send>>;
 
 // TODO: Have a separate builder
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "rt", serde_as)]
+#[cfg_attr(feature = "rt", cfg_eval::cfg_eval, serde_as)]
 #[cfg_attr(feature = "rt", derive(Serialize, Deserialize))]
 pub(crate) struct ScenarioConfig {
     pub name: String,

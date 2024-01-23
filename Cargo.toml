@@ -3,10 +3,11 @@ members = [
     "balter-core",
     "balter-macros",
     "mock-service",
-    "examples-dir",
+    "examples/*",
 ]
+
 exclude = [
-    "playground"
+    "playground",
 ]
 
 resolver = "2"

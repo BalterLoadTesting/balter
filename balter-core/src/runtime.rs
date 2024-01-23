@@ -10,7 +10,8 @@ use crate::{
 use async_channel::{bounded, Receiver, Sender};
 use clap::Parser;
 use lazy_static::lazy_static;
-use linkme::distributed_slice;
+#[doc(hidden)]
+pub use linkme::distributed_slice;
 use std::{collections::HashMap, net::SocketAddr};
 use tracing::{debug, error, info, instrument, Instrument};
 

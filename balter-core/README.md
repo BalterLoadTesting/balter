@@ -162,10 +162,12 @@ async fn my_transaction() -> Result<u32, String> {
 
 Running a load test on a single server is limited, and Balter aims to provide a distributed runtime. Currently Balter supports distributed load tests, but they are fragile and not efficient. This functionality will improve over time, but the current support should be considered experimental.
 
-To use the distributed runtime, you need to set the `rt` feature flag. This will also include a number of additional dependencies (which we hope to slim down).
+To use the distributed runtime, you need to set the `rt` feature flag. This will also include a number of additional dependencies (which we hope to slim down). You will also need to add `linkme` to your dependencies list.
+
 ```toml
 [dependencies]
 balter = { version = "0.1", features = ["rt"] }
+linkme = "0.3"
 ```
 
 The next step is to instantiate the runtime. This is needed in order to set up the server and gossip functionality.

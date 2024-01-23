@@ -1,12 +1,16 @@
 build-release:
     cargo build --release
 
+publish:
+    cd balter-macros && cargo publish
+    cd balter-core && cargo publish
+
 basic-tps: mock-service
     cargo build --release --example basic-tps
     bash test-scripts/basic-test-runner.sh basic-tps
 
 basic-saturate: mock-service
-    cargo build --release --example basic-saturate
+    cd examples/basic-examples && cargo build --release --example basic-saturate
     bash test-scripts/basic-test-runner.sh basic-saturate
 
 gossip-test:

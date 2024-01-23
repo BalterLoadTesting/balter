@@ -22,12 +22,23 @@ cfg_rt! {
 cfg_rt! {
     pub use crate::runtime::BalterRuntime;
 }
+
+cfg_rt! {
+    pub use balter_macros::{scenario_linkme as scenario, transaction};
+}
+#[cfg(not(feature = "rt"))]
 pub use balter_macros::{scenario, transaction};
+
 pub use scenario::Scenario;
 
 pub mod prelude {
     cfg_rt! {
-        pub use crate::runtime::BalterRuntime;
+        pub use crate::runtime::{distributed_slice, BalterRuntime};
     }
+
+    cfg_rt! {
+        pub use balter_macros::{scenario_linkme as scenario, transaction};
+    }
+    #[cfg(not(feature = "rt"))]
     pub use balter_macros::{scenario, transaction};
 }

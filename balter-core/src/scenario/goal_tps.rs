@@ -220,7 +220,10 @@ impl<'a> GoalTpsTaskLearner<'a> {
                 } else {
                     self.previous.push(mean_tps);
                     self.task_count += 1;
-                    debug!("Increasing task count to {}", self.task_count);
+                    debug!(
+                        "Measured {mean_tps}, increasing task count to {}",
+                        self.task_count
+                    );
                 }
             } else {
                 debug!("Found task count: {}", self.task_count);

@@ -59,10 +59,15 @@ fn transaction_internal(_attr: TokenStream, item: TokenStream) -> TokenStream2 {
 /// ```
 #[proc_macro_attribute]
 pub fn scenario(attr: TokenStream, item: TokenStream) -> TokenStream {
-    scenario_internal(attr, item).into()
+    scenario_internal(attr, item, false).into()
 }
 
-fn scenario_internal(_attr: TokenStream, item: TokenStream) -> TokenStream2 {
+#[proc_macro_attribute]
+pub fn scenario_linkme(attr: TokenStream, item: TokenStream) -> TokenStream {
+    scenario_internal(attr, item, true).into()
+}
+
+fn scenario_internal(_attr: TokenStream, item: TokenStream, linkme: bool) -> TokenStream2 {
     let input = syn::parse::<ItemFn>(item).unwrap();
 
     let ItemFn {
@@ -105,10 +110,7 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream) -> TokenStream2 {
         Span::call_site(),
     );
 
-    quote! {
-        #[::linkme::distributed_slice(::balter::runtime::BALTER_SCENARIOS)]
-        static #static_name: (&'static str, fn() -> ::balter::scenario::Scenario) = (stringify!(#scen_name), #scen_name);
-
+    let res = quote! {
         #(#attrs)* #vis #scen_sig {
             ::balter::scenario::Scenario::new(stringify!(#scen_name), #inter_name)
         }
@@ -122,5 +124,17 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream) -> TokenStream2 {
         #(#attrs)* #vis #new_sig {
             #(#stmts)*
         }
+    };
+
+    if linkme {
+        let mut linkme = quote! {
+            #[::balter::runtime::distributed_slice(::balter::runtime::BALTER_SCENARIOS)]
+            static #static_name: (&'static str, fn() -> ::balter::scenario::Scenario) = (stringify!(#scen_name), #scen_name);
+        };
+
+        linkme.extend(res.into_iter());
+        linkme
+    } else {
+        res
     }
 }
