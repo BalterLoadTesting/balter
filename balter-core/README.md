@@ -189,13 +189,13 @@ Assuming the first server is running on `127.0.0.1:7621` (the first server does 
 $ ./load_test_binary -n 127.0.0.1:7621
 ```
 
-Once the services are all pointed at each other, they will begin to gossip and coordinate. To start a load test, you make an HTTP request to the `/run` endpoint of *any* of the services in the mesh with the name being the function name of the scenario you would like to run. Note that all parameters must be specified.
+Once the services are all pointed at each other, they will begin to gossip and coordinate. To start a load test, you make an HTTP request to the `/run` endpoint of *any* of the services in the mesh with the name being the function name of the scenario you would like to run. Currently you must specify all parameters, and `.saturate()`, `overload()` and `error_rate()` are all under one header (`Saturate`).
 
 ```bash
 $ # For running a TPS load test
 $ curl "127.0.0.1:7621/run" --json '{ "name": "my_scenario", "duration": 30, "kind": { "Tps": 500 }}'
 
-$ # For running a saturate load test
+$ # For running a saturate/overload/error_rate load test (`.saturate()` is 0.03, `.overload()` is 0.80)
 $ curl "127.0.0.1:7621/run" --json '{ "name": "my_scenario", "duration": 30, "kind": { "Saturate": 0.03 }}'
 ```
 
