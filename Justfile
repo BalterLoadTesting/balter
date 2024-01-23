@@ -2,6 +2,7 @@ build-release:
     cargo build --release
 
 publish:
+    cargo clippy --all-targets -- -D warnings
     cd balter-macros && cargo publish
     cd balter-core && cargo publish
 

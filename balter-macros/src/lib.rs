@@ -132,7 +132,7 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream, linkme: bool) -> Tok
             static #static_name: (&'static str, fn() -> ::balter::scenario::Scenario) = (stringify!(#scen_name), #scen_name);
         };
 
-        linkme.extend(res.into_iter());
+        linkme.extend(res);
         linkme
     } else {
         res
