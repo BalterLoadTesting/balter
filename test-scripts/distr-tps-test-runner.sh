@@ -32,7 +32,7 @@ cpulimit -l 15 -p $SERVICE_1_PID &
 
 # 4. Kick off the load tests suite with a curl command, and then wait on it.
 sleep 1
-curl -XPOST "0.0.0.0:7621/run" --json '{ "name": "scenario_a", "duration": 30, "kind": { "Tps": 500  }}'
+curl -XPOST "0.0.0.0:7621/run" --json '{ "name": "scenario_a", "duration": 120, "kind": { "Tps": 500  }}'
 
 tail --pid=$MOCK_SERVICE_PID -f /dev/null
 

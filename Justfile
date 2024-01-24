@@ -1,8 +1,12 @@
 build-release:
     cargo build --release
 
-publish:
+prep:
+    cargo fmt --all -- --check
     cargo clippy --all-targets -- -D warnings
+    cargo test --verbose
+
+publish: prep
     cd balter-macros && cargo publish
     cd balter-core && cargo publish
 

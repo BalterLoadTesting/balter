@@ -11,11 +11,11 @@ use std::{
     time::Duration,
 };
 
+mod concurrency_controller;
+mod error_rate_controller;
 mod goal_tps;
 mod saturate;
-
-use goal_tps::run_goal_tps;
-use saturate::run_saturate;
+mod tps_sampler;
 
 /// The default error rate used for `.saturate()`
 pub const DEFAULT_SATURATE_ERROR_RATE: f64 = 0.03;
@@ -45,6 +45,32 @@ impl ScenarioConfig {
             name: name.to_string(),
             duration: Default::default(),
             kind: Default::default(),
+        }
+    }
+
+    pub fn goal_tps(&self) -> Option<u32> {
+        if let ScenarioKind::Tps(goal_tps) = self.kind {
+            Some(goal_tps)
+        } else {
+            None
+        }
+    }
+
+    pub fn set_goal_tps(&mut self, new_goal_tps: u32) -> bool {
+        if let ScenarioKind::Tps(goal_tps) = &mut self.kind {
+            *goal_tps = new_goal_tps;
+            true
+        } else {
+            false
+        }
+    }
+
+    #[allow(unused)]
+    pub fn error_rate(&self) -> Option<f64> {
+        if let ScenarioKind::Saturate(error_rate) = self.kind {
+            Some(error_rate)
+        } else {
+            None
         }
     }
 }
@@ -223,7 +249,7 @@ impl Future for Scenario {
         if self.runner_fut.is_none() {
             let fut = self.fut;
             let config = self.config.clone();
-            // TODO: There must be a way to run this future without boxing it. I'm feel like I'm
+            // TODO: There must be a way to run this future without boxing it. I feel like I'm
             // missing something really simple here.
             self.runner_fut = Some(Box::pin(async move { run_scenario(fut, config).await }));
         }
@@ -239,7 +265,7 @@ impl Future for Scenario {
 async fn run_scenario(scenario: fn() -> BoxedFut, config: ScenarioConfig) {
     match config.kind {
         ScenarioKind::Once => scenario().await,
-        ScenarioKind::Tps(goal_tps) => run_goal_tps(scenario, config, goal_tps).await,
-        ScenarioKind::Saturate(error_rate) => run_saturate(scenario, config, error_rate).await,
+        ScenarioKind::Tps(_) => goal_tps::run_tps(scenario, config).await,
+        ScenarioKind::Saturate(_) => saturate::run_saturate(scenario, config).await,
     }
 }

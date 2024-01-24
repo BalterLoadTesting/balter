@@ -23,6 +23,7 @@ Balter, short for *Build A Load TestER*, is a load/stress testing framework for 
 - [ ] Peer discovery via DNS
 - [ ] Autoscaling hooks
 - [ ] More customizability (eg. keyed transaction limits)
+- [ ] Efficiency improvements
 
 ## How To Use
 
@@ -141,7 +142,7 @@ async fn main() {
 
     my_scenario()
         .saturate()
-        .duration(Duration::from_secs(30))
+        .duration(Duration::from_secs(120))
         .await;
 }
 
@@ -162,7 +163,7 @@ async fn my_transaction() -> Result<u32, String> {
 
 Running a load test on a single server is limited, and Balter aims to provide a distributed runtime. Currently Balter supports distributed load tests, but they are fragile and not efficient. This functionality will improve over time, but the current support should be considered experimental.
 
-To use the distributed runtime, you need to set the `rt` feature flag. This will also include a number of additional dependencies (which we hope to slim down). You will also need to add `linkme` to your dependencies list.
+To use the distributed runtime, you need to set the `rt` feature flag. You will also need to add `linkme` to your dependencies list.
 
 ```toml
 [dependencies]

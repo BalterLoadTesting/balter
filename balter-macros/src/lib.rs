@@ -62,6 +62,21 @@ pub fn scenario(attr: TokenStream, item: TokenStream) -> TokenStream {
     scenario_internal(attr, item, false).into()
 }
 
+/// Proc macro to denote a Scenario
+///
+/// NOTE: Currently this macro only works on functions which take no arguments and with no return value.
+/// (void functions). This is a restriction which will be lifted soon.
+///
+/// See the `Scenario` struct for more information on the methods this macro provides on functions.
+///
+/// # Example
+/// ```ignore
+/// use balter::prelude::*;
+///
+/// #[scenario]
+/// fn my_scenario() {
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn scenario_linkme(attr: TokenStream, item: TokenStream) -> TokenStream {
     scenario_internal(attr, item, true).into()
