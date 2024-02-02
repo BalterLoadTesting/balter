@@ -56,6 +56,7 @@ impl ScenarioConfig {
         }
     }
 
+    #[allow(unused)]
     pub fn set_goal_tps(&mut self, new_goal_tps: u32) -> bool {
         if let ScenarioKind::Tps(goal_tps) = &mut self.kind {
             *goal_tps = new_goal_tps;

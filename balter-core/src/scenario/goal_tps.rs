@@ -2,6 +2,7 @@ use super::{concurrency_controller::ConcurrencyController, tps_sampler::TpsSampl
 use super::{BoxedFut, ScenarioConfig};
 #[cfg(feature = "rt")]
 use crate::runtime::BALTER_OUT;
+#[allow(unused_imports)]
 use std::time::{Duration, Instant};
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
