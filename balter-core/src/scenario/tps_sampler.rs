@@ -14,14 +14,16 @@ use std::{
 use tokio::task::JoinSet;
 use tracing::{debug, error, trace};
 
-// TODO: Experimentally find values rather than just guessing.
-const DEFAULT_SAMPLE_SIZE: u64 = 20;
+// TODO: The value here should be to compensate for the overhead of JoinSet, which is (maybe) a
+// constant time factor. Not entirely clear how to dynamically size this value to minimize JoinSet
+// overhead while maximizing responsiveness.
+const DEFAULT_SAMPLE_SIZE: u64 = 200;
 
 pub(crate) struct TpsSampler {
     scenario: fn() -> BoxedFut,
     pub(crate) limiter: Option<Arc<DefaultDirectRateLimiter>>,
-    pub(crate) concurrent_count: usize,
-    pub(crate) batch_size: usize,
+    pub(crate) concurrent_count: u64,
+    pub(crate) batch_size: u64,
     join_set: JoinSet<TpsData>,
     tps_limit: f64,
 }
@@ -42,44 +44,59 @@ impl TpsSampler {
     }
 
     pub(crate) async fn sample_tps(&mut self) -> Option<TpsData> {
-        #[allow(clippy::redundant_pattern_matching)]
-        let res = if let Some(tps_data) = self.join_set.join_next().await {
-            // TODO: Properly handle errors
-            let tps_data = tps_data.unwrap();
+        let mut res;
+        loop {
+            // At the start we might collect too little data to have any valid measurements.
+            // Effectively this is a warmup period without being explicit about it. Would be nice
+            // to make this adaptive somehow.
+            let mut bad_data = false;
 
-            if tps_data.total() == 0 {
-                error!("No transaction data for completed scenario.");
+            //#[allow(clippy::redundant_pattern_matching)]
+            res = if let Some(tps_data) = self.join_set.join_next().await {
+                // TODO: Properly handle errors
+                let tps_data = tps_data.unwrap();
+
+                if tps_data.total() == 0 {
+                    error!("No transaction data for completed scenario.");
+                    return None;
+                } else if tps_data.total() < DEFAULT_SAMPLE_SIZE {
+                    let transactions_per_run = tps_data.total() / self.batch_size;
+                    let optimal_batch_size = DEFAULT_SAMPLE_SIZE / transactions_per_run;
+                    self.batch_size = optimal_batch_size;
+                    bad_data = true;
+                    debug!("Increasing sampling batch size to {}", self.batch_size);
+                } else if tps_data.total() > 2 * DEFAULT_SAMPLE_SIZE {
+                    // TODO: Really simplistic adaptive batch controls here for scenarios. Would be
+                    // good to have something smarter, but this works and doesn't blow up.
+                    self.batch_size -= 1;
+                    trace!("Reducing sampling batch size to {}", self.batch_size);
+                }
+
+                // TODO: Sharsty stats. Since each returned value is 1/N of the number of tasks, we
+                // just multiply here. But it means our success and error counts in the TpsData are
+                // fudged.
+                let mut tps_data = tps_data;
+                tps_data.success_count *= self.concurrent_count;
+                tps_data.error_count *= self.concurrent_count;
+
+                Some(tps_data)
+            } else {
+                error!("Something went wrong");
                 return None;
-            } else if tps_data.total() < DEFAULT_SAMPLE_SIZE {
-                // TODO: Really simplistic adaptive batch controls here for scenarios. Would be
-                // good to have something smarter, but this works and doesn't blow up.
-                self.batch_size += 1;
-                trace!("Increasing sampling batch size to {}", self.batch_size);
-            } else if tps_data.total() > 2 * DEFAULT_SAMPLE_SIZE {
-                self.batch_size -= 1;
-                trace!("Reducing sampling batch size to {}", self.batch_size);
+            };
+
+            self.populate_jobs();
+
+            if !bad_data {
+                break;
             }
-
-            // TODO: Sharsty stats. Since each returned value is 1/N of the number of tasks, we
-            // just multiply here. But it means our success and error counts in the TpsData are
-            // fudged.
-            let mut tps_data = tps_data;
-            tps_data.success_count *= self.concurrent_count as u64;
-            tps_data.error_count *= self.concurrent_count as u64;
-
-            Some(tps_data)
-        } else {
-            error!("Something went wrong");
-            return None;
-        };
-
-        self.populate_jobs();
+        }
 
         res
     }
 
     fn populate_jobs(&mut self) {
-        while self.join_set.len() < self.concurrent_count {
+        while self.join_set.len() < self.concurrent_count as usize {
             let scenario = self.scenario;
 
             let success = Arc::new(AtomicU64::new(0));
@@ -109,7 +126,7 @@ impl TpsSampler {
         }
     }
 
-    pub(crate) fn set_concurrent_count(&mut self, concurrent_count: usize) {
+    pub(crate) fn set_concurrent_count(&mut self, concurrent_count: u64) {
         self.concurrent_count = concurrent_count;
         self.populate_jobs();
     }
@@ -167,14 +184,8 @@ mod tests {
 
         assert!(tps_sampler.batch_size > 1);
         let _tps_data = tps_sampler.sample_tps().await;
-        let _tps_data = tps_sampler.sample_tps().await;
-        let _tps_data = tps_sampler.sample_tps().await;
-        let _tps_data = tps_sampler.sample_tps().await;
-        let _tps_data = tps_sampler.sample_tps().await;
-        let _tps_data = tps_sampler.sample_tps().await;
-        let _tps_data = tps_sampler.sample_tps().await;
         let prev_size = tps_sampler.batch_size;
         let _tps_data = tps_sampler.sample_tps().await;
-        assert!(tps_sampler.batch_size > prev_size);
+        assert_eq!(tps_sampler.batch_size, prev_size);
     }
 }

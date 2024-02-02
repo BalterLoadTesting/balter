@@ -6,8 +6,7 @@ use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 const STARTING_TPS: f64 = 256.;
 
 // TODO: Calculate experimentally
-const MAX_SAMPLE_COUNT: usize = 10;
-const MIN_SAMPLE_COUNT: usize = 5;
+const SAMPLE_WINDOW: usize = 20;
 
 pub(crate) struct ErrorRateController {
     // NOTE: Samples are most recent first
@@ -37,7 +36,7 @@ impl ErrorRateController {
         self.goal_tps
     }
 
-    pub fn concurrency_count(&self) -> usize {
+    pub fn concurrency_count(&self) -> u64 {
         self.cc.concurrent_count()
     }
 
@@ -53,16 +52,16 @@ impl ErrorRateController {
     pub fn push(&mut self, sample: TpsData) {
         self.cc.push(sample.tps());
         if self.cc.is_stable() {
+            trace!("ConcurrencyController is stable");
             self.samples.push_front(sample);
-            if self.samples.len() > MAX_SAMPLE_COUNT {
+            if self.samples.len() > SAMPLE_WINDOW {
                 let _ = self.samples.pop_back();
-            }
 
-            if self.samples.len() > MIN_SAMPLE_COUNT {
                 #[allow(clippy::collapsible_if)]
                 if self.analyze() {
-                    self.cc.set_goal_tps(self.goal_tps);
-                    self.clear();
+                    if self.cc.set_goal_tps(self.goal_tps) {
+                        self.clear();
+                    }
                 }
             }
         } else if let Some(max_tps) = self.cc.is_underpowered() {
@@ -71,6 +70,8 @@ impl ErrorRateController {
             // will put out an unecessary ping to the network if run distributed.
             self.state = ErrorRateState::Underpowered;
             self.goal_tps = max_tps;
+        } else {
+            trace!("ConcurrencyController is still working.");
         }
     }
 

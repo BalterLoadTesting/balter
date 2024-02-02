@@ -3,14 +3,13 @@ use std::collections::VecDeque;
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 
 // TODO: Calculate experimentally
-const MAX_SAMPLE_COUNT: usize = 50;
-const MIN_SAMPLE_COUNT: usize = 10;
+const SAMPLE_WINDOW: usize = 20;
 
 #[derive(Debug)]
 pub(crate) struct ConcurrencyController {
     samples: VecDeque<f64>,
     previous_measured_values: Vec<ConcurrencyMeasurements>,
-    concurrent_count: usize,
+    concurrent_count: u64,
     goal_tps: f64,
     state: ConcurrencyControllerState,
 }
@@ -40,16 +39,13 @@ impl ConcurrencyController {
     pub(crate) fn push(&mut self, sample: f64) {
         self.samples.push_back(sample);
 
-        if self.samples.len() > MAX_SAMPLE_COUNT {
+        if self.samples.len() > SAMPLE_WINDOW {
             let _ = self.samples.pop_front();
-        }
-
-        if self.samples.len() > MIN_SAMPLE_COUNT {
             self.analyze();
         }
     }
 
-    pub(crate) fn concurrent_count(&self) -> usize {
+    pub(crate) fn concurrent_count(&self) -> u64 {
         self.concurrent_count
     }
 
@@ -65,10 +61,13 @@ impl ConcurrencyController {
         self.state == ConcurrencyControllerState::Stable
     }
 
-    pub(crate) fn set_goal_tps(&mut self, goal_tps: f64) {
+    pub(crate) fn set_goal_tps(&mut self, goal_tps: f64) -> bool {
         if (goal_tps - self.goal_tps).abs() > f64::EPSILON {
             self.goal_tps = goal_tps;
             self.reset();
+            true
+        } else {
+            false
         }
     }
 
@@ -96,8 +95,9 @@ impl ConcurrencyController {
         } else if error.is_sign_positive() {
             let std = std(&self.samples);
 
-            if (mean + std) >= self.goal_tps {
-                debug!("Too much noise in data to adapt. mean={mean}, std={std}");
+            if std > mean {
+                debug!("Too much noise in data to adapt. mean={mean}, std={std}. Resetting.");
+                self.reset();
             } else {
                 let cur_measurements = ConcurrencyMeasurements {
                     concurrent_count: self.concurrent_count,
@@ -108,33 +108,33 @@ impl ConcurrencyController {
                 /*
                  * Transition table:
                  * (TODO: There is likely a simpler way of doing this)
-                | count | prev          | cond   | res          | equivalent     |
-                |-------|---------------|--------|--------------|----------------|
-                | x     | []            |        | x+[x]        | x[x-]          |
-                |       |               |        |              |                |
-                | x     | [x-]          | x > x- | x+[x,x-]     | x[x-,x--]      |
-                |       |               | x < x- | x-[x,x-]     | x[x+,x]        |
-                |       |               |        |              |                |
-                | x     | [x+, x]       | x > x+ | x-[x, x+, x] | x[x+,x++,x+]   |
-                |       |               | x < x+ | reset        |                |
-                |       |               |        |              |                |
-                | x     | [x-, x--]     | x > x- | x+[x,x-,x--] | x[x-,x--,x---] |
-                |       |               | x < x- | x-[x,x-,x--] | x[x+,x,x-]     |
-                |       |               |        |              |                |
-                | x     | [x+, x++, x+] | x > x+ | x-[x,x+,x++] | x[x+,x++,x+++] |
-                |       |               | x < x+ | x+[x,x+,x++] | x[x-,x,x+]     |
-                |       |               |        |              |                |
-                | x     | [x+,x++,x+++] | x > x+ | x-[x,x+,x++] | x[x+,x++,x+++] |
-                |       |               | x < x+ | x+[x,x+,x++] | x[x-,x,x+]     |
-                |       |               |        |              |                |
-                | x     | [x-,x--,x---] | x > x- | x+[x,x-,x--] | x[x-,x--,x---] |
-                |       |               | x < x- | x-[x,x-,x--] | x[x+,x,x-]     |
-                |       |               |        |              |                |
-                | x     | [x-,x,x+]     | x > x- | stable       |                |
-                |       |               | x < x- | reset        |                |
-                |       |               |        |              |                |
-                | x     | [x+,x,x-]     | x > x+ | stable       |                |
-                |       |               | x < x+ | reset        |                |
+                | state          | cond   | res          | equivalent     |
+                |----------------|--------|--------------|----------------|
+                | x[]            |        | x+[x]        | x[x-]          |
+                |                |        |              |                |
+                | x[x-]          | x > x- | x+[x,x-]     | x[x-,x--]      |
+                |                | x < x- | x-[x,x-]     | x[x+,x]        |
+                |                |        |              |                |
+                | x[x+, x]       | x > x+ | x-[x, x+, x] | x[x+,x++,x+]   |
+                |                | x < x+ | reset        |                |
+                |                |        |              |                |
+                | x[x-, x--]     | x > x- | x+[x,x-,x--] | x[x-,x--,x---] |
+                |                | x < x- | x-[x,x-,x--] | x[x+,x,x-]     |
+                |                |        |              |                |
+                | x[x+, x++, x+] | x > x+ | x-[x,x+,x++] | x[x+,x++,x+++] |
+                |                | x < x+ | x+[x,x+,x++] | x[x-,x,x+]     |
+                |                |        |              |                |
+                | x[x+,x++,x+++] | x > x+ | x-[x,x+,x++] | x[x+,x++,x+++] |
+                |                | x < x+ | x+[x,x+,x++] | x[x-,x,x+]     |
+                |                |        |              |                |
+                | x[x-,x--,x---] | x > x- | x+[x,x-,x--] | x[x-,x--,x---] |
+                |                | x < x- | x-[x,x-,x--] | x[x+,x,x-]     |
+                |                |        |              |                |
+                | x[x-,x,x+]     | x > x- | stable       |                |
+                |                | x < x- | reset        |                |
+                |                |        |              |                |
+                | x[x+,x,x-]     | x > x+ | stable       |                |
+                |                | x < x+ | reset        |                |
                 */
                 match &self.previous_measured_values.as_slice() {
                     [] => {
@@ -258,7 +258,7 @@ impl ConcurrencyController {
             }
         } else if error.abs() > 0.25 {
             // TODO: We're triggering this too often.
-            //warn!("Way over TPS limits: {mean}, {error}");
+            warn!("Way over TPS limits: {mean}, {error}");
         }
     }
 
@@ -274,7 +274,7 @@ impl ConcurrencyController {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) struct ConcurrencyMeasurements {
-    pub concurrent_count: usize,
+    pub concurrent_count: u64,
     pub mean: f64,
     pub std: f64,
 }
