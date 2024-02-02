@@ -129,9 +129,10 @@ impl TpsSampler {
     pub(crate) fn set_tps_limit(&mut self, tps: f64) {
         if (self.tps_limit - tps).abs() > f64::EPSILON {
             debug!("New rate limiter set for {tps} TPS.");
-            let limiter = RateLimiter::direct(Quota::per_second(
-                NonZeroU32::new(tps.floor() as u32).unwrap(),
-            ));
+            let limiter = RateLimiter::direct(
+                Quota::per_second(NonZeroU32::new(tps.floor() as u32).unwrap())
+                    .allow_burst(NonZeroU32::new(100).unwrap()),
+            );
             self.limiter = Some(Arc::new(limiter));
             self.tps_limit = tps;
         }
@@ -147,7 +148,7 @@ pub(crate) struct TpsData {
 
 impl TpsData {
     pub(crate) fn tps(&self) -> f64 {
-        (self.success_count + self.error_count) as f64 / self.elapsed.as_millis() as f64 * 1000.
+        (self.success_count + self.error_count) as f64 / self.elapsed.as_nanos() as f64 * 1e9
     }
 
     pub(crate) fn error_rate(&self) -> f64 {

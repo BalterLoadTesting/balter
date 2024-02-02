@@ -1,4 +1,5 @@
 /target
+**/*/target
 playground/
 notes.md
 Cargo.lock

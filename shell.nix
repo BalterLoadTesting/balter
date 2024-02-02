@@ -13,6 +13,7 @@ mkShell {
     rustfmt
     clippy
     linuxPackages_latest.perf
+    hyperfine
   ];
 
   RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
