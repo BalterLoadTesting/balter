@@ -33,7 +33,7 @@ First you need to include Balter in your `Cargo.toml`.
 
 ```toml
 [dependencies]
-balter = "0.1"
+balter = "0.2"
 ```
 
 A _transaction_ is a single request to your service.
@@ -167,7 +167,7 @@ To use the distributed runtime, you need to set the `rt` feature flag. You will 
 
 ```toml
 [dependencies]
-balter = { version = "0.1", features = ["rt"] }
+balter = { version = "0.2", features = ["rt"] }
 linkme = "0.3"
 ```
 
