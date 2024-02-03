@@ -23,16 +23,12 @@ pub const DEFAULT_SATURATE_ERROR_RATE: f64 = 0.03;
 /// The default error rate used for `.overload()`
 pub const DEFAULT_OVERLOAD_ERROR_RATE: f64 = 0.80;
 
-// TODO: We should _not_ need to use a Boxed future! Every single function call for any load
-// testing is boxed which *sucks*. Unfortunately I haven't figured out how to appease the Type
-// system.
-pub(crate) type BoxedFut = Pin<Box<dyn Future<Output = ()> + Send>>;
-
 // TODO: Have a separate builder
+#[doc(hidden)]
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "rt", cfg_eval::cfg_eval, serde_as)]
 #[cfg_attr(feature = "rt", derive(Serialize, Deserialize))]
-pub(crate) struct ScenarioConfig {
+pub struct ScenarioConfig {
     pub name: String,
     #[cfg_attr(feature = "rt", serde_as(as = "DurationSeconds"))]
     pub duration: Duration,
@@ -84,9 +80,10 @@ impl ScenarioConfig {
     }
 }
 
+#[doc(hidden)]
 #[derive(Default, Clone, Copy, Debug)]
 #[cfg_attr(feature = "rt", derive(Serialize, Deserialize))]
-pub(crate) enum ScenarioKind {
+pub enum ScenarioKind {
     #[default]
     Once,
     Tps(u32),
@@ -98,22 +95,83 @@ pub(crate) enum ScenarioKind {
 ///
 /// Handler for running scenarios. Not intended for manual creation, use the [`#[scenario]`](balter_macros::scenario) macro which will add these methods to functions.
 #[pin_project::pin_project]
-pub struct Scenario {
-    fut: fn() -> BoxedFut,
+pub struct Scenario<T> {
+    func: T,
     runner_fut: Option<Pin<Box<dyn Future<Output = ()> + Send>>>,
     config: ScenarioConfig,
 }
 
-impl Scenario {
+impl<T> Scenario<T> {
     #[doc(hidden)]
-    pub fn new(name: &str, fut: fn() -> BoxedFut) -> Self {
+    pub fn new(name: &str, func: T) -> Self {
         Self {
-            fut,
+            func,
             runner_fut: None,
             config: ScenarioConfig::new(name),
         }
     }
+}
 
+impl<T, F> Future for Scenario<T>
+where
+    T: Fn() -> F + Send + 'static + Clone + Sync,
+    F: Future<Output = ()> + Send,
+{
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.runner_fut.is_none() {
+            let func = self.func.clone();
+            let config = self.config.clone();
+            self.runner_fut = Some(Box::pin(async move { run_scenario(func, config).await }));
+        }
+
+        if let Some(runner) = &mut self.runner_fut {
+            runner.as_mut().poll(cx)
+        } else {
+            unreachable!()
+        }
+    }
+}
+
+#[doc(hidden)]
+pub trait DistributedScenario: Future + Send {
+    /// The strange type-signature is to facilitate treating this as a trait object for the
+    /// distributed functionality.
+    fn set_config(
+        &self,
+        config: ScenarioConfig,
+    ) -> Pin<Box<dyn DistributedScenario<Output = Self::Output>>>;
+}
+
+impl<T, F> DistributedScenario for Scenario<T>
+where
+    T: Fn() -> F + Send + 'static + Clone + Sync,
+    F: Future<Output = ()> + Send,
+{
+    #[allow(unused)]
+    fn set_config(
+        &self,
+        _config: ScenarioConfig,
+    ) -> Pin<Box<dyn DistributedScenario<Output = Self::Output>>> {
+        unimplemented!()
+    }
+}
+
+pub trait ConfigurableScenario<T: Send>: Future<Output = T> + Sized + Send {
+    fn saturate(self) -> Self;
+    fn overload(self) -> Self;
+    fn error_rate(self, error_rate: f64) -> Self;
+    fn tps(self, tps: u32) -> Self;
+    fn direct(self, tps_limit: u32, concurrency: usize) -> Self;
+    fn duration(self, duration: Duration) -> Self;
+}
+
+impl<T, F> ConfigurableScenario<()> for Scenario<T>
+where
+    T: Fn() -> F + Send + 'static + Clone + Sync,
+    F: Future<Output = ()> + Send,
+{
     /// Run the scenario increasing TPS until an error rate of 3% is reached.
     ///
     /// NOTE: Must supply a `.duration()` as well
@@ -135,7 +193,7 @@ impl Scenario {
     /// async fn my_scenario() {
     /// }
     /// ```
-    pub fn saturate(mut self) -> Self {
+    fn saturate(mut self) -> Self {
         self.config.kind = ScenarioKind::Saturate(DEFAULT_SATURATE_ERROR_RATE);
         self
     }
@@ -161,7 +219,7 @@ impl Scenario {
     /// async fn my_scenario() {
     /// }
     /// ```
-    pub fn overload(mut self) -> Self {
+    fn overload(mut self) -> Self {
         self.config.kind = ScenarioKind::Saturate(DEFAULT_OVERLOAD_ERROR_RATE);
         self
     }
@@ -187,7 +245,7 @@ impl Scenario {
     /// async fn my_scenario() {
     /// }
     /// ```
-    pub fn error_rate(mut self, error_rate: f64) -> Self {
+    fn error_rate(mut self, error_rate: f64) -> Self {
         self.config.kind = ScenarioKind::Saturate(error_rate);
         self
     }
@@ -213,7 +271,7 @@ impl Scenario {
     /// async fn my_scenario() {
     /// }
     /// ```
-    pub fn tps(mut self, tps: u32) -> Self {
+    fn tps(mut self, tps: u32) -> Self {
         self.config.kind = ScenarioKind::Tps(tps);
         self
     }
@@ -221,7 +279,7 @@ impl Scenario {
     /// Run the scenario with direct control over TPS and concurrency.
     /// No automatic controls will limit or change any values. This is intended
     /// for development testing or advanced ussage.
-    pub fn direct(mut self, tps_limit: u32, concurrency: usize) -> Self {
+    fn direct(mut self, tps_limit: u32, concurrency: usize) -> Self {
         self.config.kind = ScenarioKind::Direct(tps_limit, concurrency);
         self
     }
@@ -247,40 +305,17 @@ impl Scenario {
     /// async fn my_scenario() {
     /// }
     /// ```
-    pub fn duration(mut self, duration: Duration) -> Self {
+    fn duration(mut self, duration: Duration) -> Self {
         self.config.duration = duration;
         self
     }
-
-    #[cfg(feature = "rt")]
-    pub(crate) fn set_config(mut self, config: ScenarioConfig) -> Self {
-        self.config = config;
-        self
-    }
 }
 
-impl Future for Scenario {
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // TODO: Surely there is a cleaner way to do this...
-        if self.runner_fut.is_none() {
-            let fut = self.fut;
-            let config = self.config.clone();
-            // TODO: There must be a way to run this future without boxing it. I feel like I'm
-            // missing something really simple here.
-            self.runner_fut = Some(Box::pin(async move { run_scenario(fut, config).await }));
-        }
-
-        if let Some(runner) = &mut self.runner_fut {
-            runner.as_mut().poll(cx)
-        } else {
-            unreachable!()
-        }
-    }
-}
-
-async fn run_scenario(scenario: fn() -> BoxedFut, config: ScenarioConfig) {
+async fn run_scenario<T, F>(scenario: T, config: ScenarioConfig)
+where
+    T: Fn() -> F + Send + Sync + 'static + Clone,
+    F: Future<Output = ()> + Send,
+{
     match config.kind {
         ScenarioKind::Once => scenario().await,
         ScenarioKind::Tps(_) => goal_tps::run_tps(scenario, config).await,

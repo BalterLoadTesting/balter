@@ -33,6 +33,7 @@ pub use balter_macros::{scenario, transaction};
 pub use scenario::Scenario;
 
 pub mod prelude {
+    pub use crate::scenario::ConfigurableScenario;
     cfg_rt! {
         pub use crate::runtime::{distributed_slice, BalterRuntime};
     }

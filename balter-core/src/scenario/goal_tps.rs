@@ -1,8 +1,9 @@
 use super::concurrency_controller::ConcurrencyController;
-use super::{BoxedFut, ScenarioConfig};
+use super::ScenarioConfig;
 #[cfg(feature = "rt")]
 use crate::runtime::BALTER_OUT;
 use crate::sampling::tps_sampler::TpsSampler;
+use std::future::Future;
 use std::num::NonZeroU32;
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
@@ -10,7 +11,11 @@ use std::time::{Duration, Instant};
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 
 #[instrument(name="scenario", skip_all, fields(name=config.name))]
-pub(crate) async fn run_tps(scenario: fn() -> BoxedFut, config: ScenarioConfig) {
+pub(crate) async fn run_tps<T, F>(scenario: T, config: ScenarioConfig)
+where
+    T: Fn() -> F + Send + Sync + 'static + Clone,
+    F: Future<Output = ()> + Send,
+{
     info!("Running {} with config {:?}", config.name, &config);
 
     let start = Instant::now();

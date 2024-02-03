@@ -1,9 +1,7 @@
-use crate::{
-    scenario::BoxedFut,
-    transaction::{TransactionData, TRANSACTION_HOOK},
-};
+use crate::transaction::{TransactionData, TRANSACTION_HOOK};
 use arc_swap::ArcSwap;
 use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
+use std::future::Future;
 use std::{
     num::NonZeroU32,
     sync::{
@@ -47,8 +45,8 @@ impl TpsData {
     }
 }
 
-pub(crate) struct TpsSampler {
-    scenario: fn() -> BoxedFut,
+pub(crate) struct TpsSampler<T> {
+    scenario: T,
     concurrent_count: Arc<AtomicUsize>,
     limiter: Arc<ArcSwap<DefaultDirectRateLimiter>>,
     tps_limit: NonZeroU32,
@@ -61,8 +59,12 @@ pub(crate) struct TpsSampler {
     error_count: Arc<AtomicU64>,
 }
 
-impl TpsSampler {
-    pub(crate) fn new(scenario: fn() -> BoxedFut, tps_limit: NonZeroU32) -> Self {
+impl<T, F> TpsSampler<T>
+where
+    T: Fn() -> F + Send + Sync + 'static + Clone,
+    F: Future<Output = ()> + Send,
+{
+    pub(crate) fn new(scenario: T, tps_limit: NonZeroU32) -> Self {
         let limiter: DefaultDirectRateLimiter = rate_limiter(tps_limit);
         let limiter: Arc<DefaultDirectRateLimiter> = Arc::new(limiter);
         let limiter: Arc<ArcSwap<DefaultDirectRateLimiter>> = Arc::new(ArcSwap::new(limiter));
@@ -131,7 +133,7 @@ impl TpsSampler {
             self.tasks.truncate(concurrent_count);
         } else {
             while self.tasks.len() < concurrent_count {
-                let scenario = self.scenario;
+                let scenario = self.scenario.clone();
                 let concurrent_count = self.concurrent_count.clone();
                 let id = self.tasks.len();
                 let transaction_data = TransactionData {
@@ -168,22 +170,18 @@ mod tests {
     use super::*;
     use rand_distr::{Distribution, Normal};
 
-    fn mock_trivial_scenario() -> BoxedFut {
-        Box::pin(async move {
-            let _ = crate::transaction::transaction_hook::<_, (), ()>(async { Ok(()) }).await;
-        })
+    async fn mock_trivial_scenario() {
+        let _ = crate::transaction::transaction_hook::<_, (), ()>(async { Ok(()) }).await;
     }
 
-    fn mock_noisy_scenario() -> BoxedFut {
-        Box::pin(async move {
-            let _ = crate::transaction::transaction_hook::<_, (), ()>(async {
-                let normal = Normal::new(100., 25.).unwrap();
-                let v: f64 = normal.sample(&mut rand::thread_rng());
-                tokio::time::sleep(Duration::from_micros(v.floor() as u64)).await;
-                Ok(())
-            })
-            .await;
+    async fn mock_noisy_scenario() {
+        let _ = crate::transaction::transaction_hook::<_, (), ()>(async {
+            let normal = Normal::new(100., 25.).unwrap();
+            let v: f64 = normal.sample(&mut rand::thread_rng());
+            tokio::time::sleep(Duration::from_micros(v.floor() as u64)).await;
+            Ok(())
         })
+        .await;
     }
 
     #[tracing_test::traced_test]

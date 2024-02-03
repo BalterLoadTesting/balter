@@ -82,8 +82,8 @@ pub fn scenario_linkme(attr: TokenStream, item: TokenStream) -> TokenStream {
     scenario_internal(attr, item, true).into()
 }
 
-fn scenario_internal(_attr: TokenStream, item: TokenStream, linkme: bool) -> TokenStream2 {
-    let input = syn::parse::<ItemFn>(item).unwrap();
+fn scenario_internal(_attr: TokenStream, item: TokenStream, _linkme: bool) -> TokenStream2 {
+    let input = syn::parse::<ItemFn>(item).expect("Macro only works on fn() items");
 
     let ItemFn {
         attrs,
@@ -102,38 +102,15 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream, linkme: bool) -> Tok
     scen_sig.asyncness = None;
     scen_sig.output = syn::parse(
         quote! {
-            -> ::balter::scenario::Scenario
+            -> impl ::balter::scenario::ConfigurableScenario<()>
         }
         .into(),
     )
-    .unwrap();
-
-    let mut inter_sig = sig.clone();
-    let inter_name = Ident::new(&format!("__balter_inter_{}", sig.ident), Span::call_site());
-    inter_sig.ident = inter_name.clone();
-    inter_sig.asyncness = None;
-    inter_sig.output = syn::parse(
-        quote! {
-            -> ::std::pin::Pin<std::boxed::Box<dyn ::std::future::Future<Output = ()> + Send>>
-        }
-        .into(),
-    )
-    .unwrap();
-
-    let static_name = Ident::new(
-        &format!("__BALTER_{}", sig.ident.to_string().to_ascii_uppercase()),
-        Span::call_site(),
-    );
+    .expect("Scenario signature is invalid");
 
     let res = quote! {
         #(#attrs)* #vis #scen_sig {
-            ::balter::scenario::Scenario::new(stringify!(#scen_name), #inter_name)
-        }
-
-        #(#attrs)* #vis #inter_sig {
-            Box::pin(async {
-                #new_name().await
-            })
+            ::balter::scenario::Scenario::new(stringify!(#scen_name), #new_name)
         }
 
         #(#attrs)* #vis #new_sig {
@@ -141,6 +118,7 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream, linkme: bool) -> Tok
         }
     };
 
+    /* TODO: Uncomment and fix the linkme functionality for the distributed runtime
     if linkme {
         let mut linkme = quote! {
             #[::balter::runtime::distributed_slice(::balter::runtime::BALTER_SCENARIOS)]
@@ -152,4 +130,6 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream, linkme: bool) -> Tok
     } else {
         res
     }
+    */
+    res
 }

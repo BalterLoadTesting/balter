@@ -4,7 +4,7 @@
 //! involves spinning up an API server and a gossip protocol task.
 use crate::{
     gossip::{gossip_task, GossipData},
-    scenario::{Scenario, ScenarioConfig},
+    scenario::{ScenarioConfig, DistributedScenario},
     server::server_task,
 };
 use async_channel::{bounded, Receiver, Sender};
@@ -29,7 +29,7 @@ lazy_static! {
 /// function pointer.
 #[doc(hidden)]
 #[distributed_slice]
-pub static BALTER_SCENARIOS: [(&'static str, fn() -> Scenario)];
+pub static BALTER_SCENARIOS: [(&'static str, fn() -> Box<dyn DistributedScenario<Output=()>>)];
 
 const DEFAULT_PORT: u16 = 7621;
 
@@ -137,9 +137,10 @@ async fn run(scenarios: HashMap<&'static str, usize>, balter: &BalterRuntime) ->
             if let Some(idx) = scenarios.get(config.name.as_str()) {
                 info!("Running scenario {}.", &config.name);
                 let scenario = BALTER_SCENARIOS[*idx];
+                let fut = scenario.1().set_config(config);
                 tokio::spawn(
                     async move {
-                        scenario.1().set_config(config).await;
+                        fut.await;
                     }
                     .in_current_span(),
                 );

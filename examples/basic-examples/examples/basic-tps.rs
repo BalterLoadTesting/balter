@@ -10,7 +10,7 @@ async fn main() {
         .init();
 
     scenario_a()
-        .tps(20_000)
+        .tps(5_000)
         .duration(Duration::from_secs(120))
         .await;
 }
