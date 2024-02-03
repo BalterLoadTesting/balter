@@ -70,8 +70,9 @@ impl ErrorRateController {
             // will put out an unecessary ping to the network if run distributed.
             self.state = ErrorRateState::Underpowered;
             self.goal_tps = max_tps;
+            self.cc.set_goal_tps(self.goal_tps);
         } else {
-            trace!("ConcurrencyController is still working.");
+            trace!("ConcurrencyController is stabalizing.");
         }
     }
 
@@ -86,13 +87,18 @@ impl ErrorRateController {
         let diff: f64 = self.error_rate - mean_error_rate;
 
         if mean_error_rate == 0.0 {
-            debug!(
-                "Error rate of 0% with goal {}%; increasing TPS.",
-                self.error_rate * 100.
-            );
-            // NOTE: Need to special-case 0.0 since it is the inflection point.
-            self.increase_tps();
-            true
+            if self.state != ErrorRateState::Underpowered {
+                debug!(
+                    "Error rate of 0% with goal {}%; increasing TPS.",
+                    self.error_rate * 100.
+                );
+                // NOTE: Need to special-case 0.0 since it is the inflection point.
+                self.increase_tps();
+                true
+            } else {
+                trace!("Error rate of 0% but state Underpowered.");
+                false
+            }
         } else if diff.abs() < 0.05 {
             self.stabalize();
             false
