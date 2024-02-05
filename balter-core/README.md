@@ -208,10 +208,6 @@ Balter is a Beta framework and there are some rough edges. This section lists th
     - Scenario must be functions which take no arguments and return no values
     - Transactions must be functions which return a `Result<T, E>`
 
-- The current statistical engine powering the TPS and Saturate functionality is not perfect
-	- It cannot handle _changing_ loads well. It finds a set point and then sits there.
-	- A highly variable measurement may cause it to find a bad set point.
-
 - The distributed functionality is experimental.
 	- Inefficient Gossip protocol being used
 	- No transaction security (no TLS, mTLS, or WSS) - use at your own risk (and in a private VPC)

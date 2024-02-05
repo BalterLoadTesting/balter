@@ -15,7 +15,7 @@ pub(crate) async fn run_saturate(scenario: fn() -> BoxedFut, config: ScenarioCon
 
     let error_rate = config.error_rate().unwrap();
     let mut controller = ErrorRateController::new(error_rate);
-    let mut sampler = TpsSampler::new(scenario, controller.goal_tps());
+    let mut sampler = TpsSampler::new(scenario, controller.goal_tps()).await;
 
     let mut underpowered = false;
 

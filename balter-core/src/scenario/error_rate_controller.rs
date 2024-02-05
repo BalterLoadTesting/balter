@@ -138,9 +138,11 @@ impl ErrorRateController {
             ErrorRateState::Underpowered => {}
             ErrorRateState::BigStep => {
                 self.goal_tps *= 2.;
+                debug!("New goal tps: {}", self.goal_tps);
             }
             ErrorRateState::SmallStep => {
                 self.goal_tps += (self.goal_tps * 0.1).floor();
+                debug!("New goal tps: {}", self.goal_tps);
             }
             ErrorRateState::Stable => {
                 self.state = ErrorRateState::SmallStep;

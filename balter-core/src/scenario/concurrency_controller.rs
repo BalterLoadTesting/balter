@@ -12,6 +12,7 @@ pub(crate) struct ConcurrencyController {
     concurrent_count: u64,
     goal_tps: f64,
     state: ConcurrencyControllerState,
+    underpowered_counter: Option<(u8, u64)>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -33,6 +34,7 @@ impl ConcurrencyController {
             concurrent_count: 1,
             goal_tps,
             state: ConcurrencyControllerState::Adaptive,
+            underpowered_counter: None,
         }
     }
 
@@ -172,7 +174,7 @@ impl ConcurrencyController {
                                 }
                             } else {
                                 trace!("I");
-                                warn!("Concurrency controller found contradiction; resetting");
+                                debug!("Concurrency controller found contradiction; resetting");
                                 self.state = ConcurrencyControllerState::Reset;
                             }
                         } else {
@@ -230,7 +232,7 @@ impl ConcurrencyController {
                                         self.set_underpowered(cur_measurements);
                                     } else {
                                         trace!("R");
-                                        warn!(
+                                        debug!(
                                             "Concurrency controller found contradiction; resetting"
                                         );
                                         self.state = ConcurrencyControllerState::Reset;
@@ -263,12 +265,31 @@ impl ConcurrencyController {
     }
 
     fn set_underpowered(&mut self, measurement: ConcurrencyMeasurements) {
-        let max_tps = (measurement.mean - measurement.std).floor();
-        info!(
-            "Server is underpowered. Capable of TPS mean={}, std={}. Reducing to {}.",
-            measurement.mean, measurement.std, max_tps
-        );
-        self.state = ConcurrencyControllerState::Underpowered(max_tps);
+        match &mut self.underpowered_counter {
+            Some((underpowered_count, concurrent_count))
+                if *concurrent_count == self.concurrent_count =>
+            {
+                if *underpowered_count > 5 {
+                    let max_tps = (measurement.mean - measurement.std).floor();
+                    info!(
+                        "Server is underpowered. Capable of TPS mean={}, std={}. Reducing to {}.",
+                        measurement.mean, measurement.std, max_tps
+                    );
+                    self.state = ConcurrencyControllerState::Underpowered(max_tps);
+                } else {
+                    *underpowered_count += 1;
+                    self.reset();
+                    trace!(
+                        "Server may be underpowered. Sampling more measurements. {:?}",
+                        self.underpowered_counter
+                    );
+                }
+            }
+            _ => {
+                self.underpowered_counter = Some((1, self.concurrent_count));
+                self.reset();
+            }
+        }
     }
 }
 
@@ -303,29 +324,17 @@ mod tests {
         let mut c = ConcurrencyController::new(100.);
 
         loop {
-            c.push(2.);
-            if c.concurrent_count == 2 {
-                break;
+            match c.concurrent_count {
+                1 => c.push(1.),
+                2 => c.push(2.),
+                3 => c.push(3.),
+                4 => c.push(4.),
+                5 => c.push(3.),
+                _ => panic!("Bug in concurrency controller."),
             }
-        }
 
-        loop {
-            c.push(5.);
-            if c.concurrent_count == 3 {
-                break;
-            }
-        }
-
-        loop {
-            c.push(4.);
-            if c.concurrent_count == 2 {
-                break;
-            }
-        }
-
-        loop {
-            c.push(5.);
             if c.is_underpowered().is_some() {
+                assert_eq!(c.concurrent_count, 4);
                 break;
             }
         }

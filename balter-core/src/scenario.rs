@@ -11,6 +11,7 @@ use std::{
     time::Duration,
 };
 
+mod batch_size_controller;
 mod concurrency_controller;
 mod error_rate_controller;
 mod goal_tps;

@@ -15,7 +15,7 @@ pub(crate) async fn run_tps(scenario: fn() -> BoxedFut, config: ScenarioConfig) 
 
     let goal_tps = config.goal_tps().unwrap();
     let mut controller = ConcurrencyController::new(goal_tps as f64);
-    let mut sampler = TpsSampler::new(scenario, goal_tps as f64);
+    let mut sampler = TpsSampler::new(scenario, goal_tps as f64).await;
 
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
     while let Some(sample) = sampler.sample_tps().await {
