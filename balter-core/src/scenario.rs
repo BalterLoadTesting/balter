@@ -11,12 +11,10 @@ use std::{
     time::Duration,
 };
 
-mod batch_size_controller;
 mod concurrency_controller;
 mod error_rate_controller;
 mod goal_tps;
 mod saturate;
-mod tps_sampler;
 
 /// The default error rate used for `.saturate()`
 pub const DEFAULT_SATURATE_ERROR_RATE: f64 = 0.03;

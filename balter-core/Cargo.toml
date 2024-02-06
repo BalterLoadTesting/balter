@@ -13,6 +13,7 @@ categories = ["development-tools", "concurrency"]
 publish = true
 
 [dependencies]
+arc-swap = "1.6.0"
 balter-macros = { version = "0.1", path = "../balter-macros" }
 governor = "0.6.0"
 humantime = "2.1.0"

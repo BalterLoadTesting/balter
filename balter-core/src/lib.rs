@@ -8,6 +8,7 @@ pub mod macros;
 cfg_rt! {
     pub mod runtime;
 }
+pub(crate) mod sampling;
 pub mod scenario;
 #[doc(hidden)]
 pub mod transaction;

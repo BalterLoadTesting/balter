@@ -87,7 +87,7 @@ impl ConcurrencyController {
         if error.abs() < 0.05 {
             if self.state != ConcurrencyControllerState::Stable {
                 self.state = ConcurrencyControllerState::Stable;
-                debug!(
+                info!(
                     "Concurrency controller is stable. Goal: {:.2}, acheiving: {:.2} at concurrency {}",
                     self.goal_tps,
                     mean,
@@ -174,7 +174,7 @@ impl ConcurrencyController {
                                 }
                             } else {
                                 trace!("I");
-                                debug!("Concurrency controller found contradiction; resetting");
+                                trace!("Concurrency controller found contradiction; resetting");
                                 self.state = ConcurrencyControllerState::Reset;
                             }
                         } else {
@@ -232,7 +232,7 @@ impl ConcurrencyController {
                                         self.set_underpowered(cur_measurements);
                                     } else {
                                         trace!("R");
-                                        debug!(
+                                        trace!(
                                             "Concurrency controller found contradiction; resetting"
                                         );
                                         self.state = ConcurrencyControllerState::Reset;
@@ -253,7 +253,7 @@ impl ConcurrencyController {
                 }
 
                 if self.concurrent_count != cur_measurements.concurrent_count {
-                    debug!("Adjusting concurrency count to {}", self.concurrent_count);
+                    trace!("Adjusting concurrency count to {}", self.concurrent_count);
                     self.samples.clear();
                     self.previous_measured_values.push(cur_measurements);
                 }
@@ -279,7 +279,7 @@ impl ConcurrencyController {
                 } else {
                     *underpowered_count += 1;
                     self.reset();
-                    trace!(
+                    info!(
                         "Server may be underpowered. Sampling more measurements. {:?}",
                         self.underpowered_counter
                     );

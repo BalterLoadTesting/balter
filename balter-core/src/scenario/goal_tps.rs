@@ -1,7 +1,9 @@
-use super::{concurrency_controller::ConcurrencyController, tps_sampler::TpsSampler};
+use super::concurrency_controller::ConcurrencyController;
 use super::{BoxedFut, ScenarioConfig};
 #[cfg(feature = "rt")]
 use crate::runtime::BALTER_OUT;
+use crate::sampling::tps_sampler::TpsSampler;
+use std::num::NonZeroU32;
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
 #[allow(unused_imports)]
@@ -15,25 +17,27 @@ pub(crate) async fn run_tps(scenario: fn() -> BoxedFut, config: ScenarioConfig) 
 
     let goal_tps = config.goal_tps().unwrap();
     let mut controller = ConcurrencyController::new(goal_tps as f64);
-    let mut sampler = TpsSampler::new(scenario, goal_tps as f64).await;
+    let mut sampler = TpsSampler::new(scenario, NonZeroU32::new(goal_tps).unwrap());
 
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
-    while let Some(sample) = sampler.sample_tps().await {
+    loop {
+        let sample = sampler.sample_tps().await;
         if start.elapsed() > config.duration {
             break;
         }
 
         controller.push(sample.tps());
-        sampler.set_concurrent_count(controller.concurrent_count());
+        sampler.set_concurrent_count(controller.concurrent_count() as usize);
 
         if let Some(max_tps) = controller.is_underpowered() {
             controller.set_goal_tps(max_tps);
-            sampler.set_tps_limit(max_tps);
+            sampler.set_tps_limit(NonZeroU32::new(max_tps as u32).unwrap());
 
             #[cfg(feature = "rt")]
             distribute_work(&config, start.elapsed(), max_tps).await;
         }
     }
+    sampler.wait_for_shutdown().await;
 
     info!("Scenario complete");
 }

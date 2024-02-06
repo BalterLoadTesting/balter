@@ -1,3 +1,4 @@
+use arc_swap::ArcSwap;
 use governor::DefaultDirectRateLimiter;
 use std::{
     future::Future,
@@ -8,9 +9,14 @@ use std::{
 };
 
 /// Transaction hook used by the `#[transaction]` macro. Not intended to be used manually.
-pub async fn transaction_hook<T: Future<Output = Result<R, E>>, R, E>(func: T) -> T::Output {
+pub async fn transaction_hook<T, R, E>(func: T) -> T::Output
+where
+    T: Future<Output = Result<R, E>>,
+{
+    // TODO: Remove clone
     if let Ok(hook) = TRANSACTION_HOOK.try_with(|v| v.clone()) {
-        if let Some(limiter) = &hook.limiter {
+        {
+            let limiter = hook.limiter.load();
             limiter.until_ready().await;
         }
 
@@ -24,14 +30,14 @@ pub async fn transaction_hook<T: Future<Output = Result<R, E>>, R, E>(func: T) -
 
         res
     } else {
-        tracing::warn!("No hook available.");
+        tracing::error!("No hook available.");
         func.await
     }
 }
 
 #[derive(Clone)]
 pub(crate) struct TransactionData {
-    pub limiter: Option<Arc<DefaultDirectRateLimiter>>,
+    pub limiter: Arc<ArcSwap<DefaultDirectRateLimiter>>,
     pub success: Arc<AtomicU64>,
     pub error: Arc<AtomicU64>,
 }

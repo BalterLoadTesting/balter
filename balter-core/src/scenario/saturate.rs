@@ -1,7 +1,9 @@
-use super::{error_rate_controller::ErrorRateController, tps_sampler::TpsSampler};
+use super::error_rate_controller::ErrorRateController;
 use super::{BoxedFut, ScenarioConfig};
 #[cfg(feature = "rt")]
 use crate::runtime::BALTER_OUT;
+use crate::sampling::tps_sampler::TpsSampler;
+use std::num::NonZeroU32;
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
 #[allow(unused_imports)]
@@ -15,19 +17,23 @@ pub(crate) async fn run_saturate(scenario: fn() -> BoxedFut, config: ScenarioCon
 
     let error_rate = config.error_rate().unwrap();
     let mut controller = ErrorRateController::new(error_rate);
-    let mut sampler = TpsSampler::new(scenario, controller.goal_tps()).await;
+    let mut sampler = TpsSampler::new(
+        scenario,
+        NonZeroU32::new(controller.goal_tps() as u32).unwrap(),
+    );
 
     let mut underpowered = false;
 
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
-    while let Some(sample) = sampler.sample_tps().await {
+    loop {
+        let sample = sampler.sample_tps().await;
         if start.elapsed() > config.duration {
             break;
         }
 
         controller.push(sample);
-        sampler.set_tps_limit(controller.goal_tps());
-        sampler.set_concurrent_count(controller.concurrency_count());
+        sampler.set_tps_limit(NonZeroU32::new(controller.goal_tps() as u32).unwrap());
+        sampler.set_concurrent_count(controller.concurrency_count() as usize);
 
         if !underpowered && controller.is_underpowered() {
             underpowered = true;
@@ -39,6 +45,7 @@ pub(crate) async fn run_saturate(scenario: fn() -> BoxedFut, config: ScenarioCon
             distribute_work(&config, start.elapsed()).await;
         }
     }
+    sampler.wait_for_shutdown().await;
 
     info!("Scenario complete");
 }
