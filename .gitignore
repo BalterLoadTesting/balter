@@ -3,3 +3,7 @@
 playground/
 notes.md
 Cargo.lock
+data/
+flamegraph.svg
+perf.data*
+prometheus.yml
