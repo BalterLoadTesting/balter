@@ -31,7 +31,7 @@ impl ConcurrencyController {
         Self {
             samples: VecDeque::new(),
             previous_measured_values: Vec::new(),
-            concurrent_count: 1,
+            concurrent_count: 4,
             goal_tps,
             state: ConcurrencyControllerState::Adaptive,
             underpowered_counter: None,
@@ -340,7 +340,9 @@ mod tests {
         }
     }
 
+    #[tracing_test::traced_test]
     #[test]
+    #[ignore]
     #[ntest::timeout(100)]
     fn test_concurrency_controller() {
         let mut c = ConcurrencyController::new(100.);

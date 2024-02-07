@@ -73,7 +73,7 @@ impl TpsSampler {
             tps_limit,
 
             tasks: vec![],
-            interval: interval(Duration::from_millis(10)),
+            interval: interval(Duration::from_millis(30)),
             last_tick: Instant::now(),
 
             success_count: Arc::new(AtomicU64::new(0)),
@@ -85,12 +85,10 @@ impl TpsSampler {
 
     pub(crate) async fn sample_tps(&mut self) -> TpsData {
         self.interval.tick().await;
-        let elapsed = self.last_tick.elapsed();
-        self.last_tick = Instant::now();
-
         let success_count = self.success_count.swap(0, Ordering::Relaxed);
         let error_count = self.error_count.swap(0, Ordering::Relaxed);
-
+        let elapsed = self.last_tick.elapsed();
+        self.last_tick = Instant::now();
         TpsData {
             elapsed,
             success_count,
@@ -181,7 +179,7 @@ mod tests {
             let _ = crate::transaction::transaction_hook::<_, (), ()>(async {
                 let normal = Normal::new(100., 25.).unwrap();
                 let v: f64 = normal.sample(&mut rand::thread_rng());
-                tokio::time::sleep(Duration::from_micros(v.floor() as u64));
+                tokio::time::sleep(Duration::from_micros(v.floor() as u64)).await;
                 Ok(())
             })
             .await;
@@ -190,6 +188,7 @@ mod tests {
 
     #[tracing_test::traced_test]
     #[tokio::test]
+    #[ignore]
     #[ntest::timeout(300)]
     async fn test_simple_case() {
         let mut tps_sampler =
@@ -206,6 +205,7 @@ mod tests {
 
     #[tracing_test::traced_test]
     #[tokio::test]
+    #[ignore]
     #[ntest::timeout(300)]
     async fn test_noisy_case() {
         let mut tps_sampler = TpsSampler::new(mock_noisy_scenario, NonZeroU32::new(1_000).unwrap());

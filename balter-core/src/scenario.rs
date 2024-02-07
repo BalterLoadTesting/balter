@@ -12,6 +12,7 @@ use std::{
 };
 
 mod concurrency_controller;
+mod direct;
 mod error_rate_controller;
 mod goal_tps;
 mod saturate;
@@ -73,6 +74,14 @@ impl ScenarioConfig {
             None
         }
     }
+
+    pub fn direct(&self) -> Option<(u32, usize)> {
+        if let ScenarioKind::Direct(tps, concurrency) = self.kind {
+            Some((tps, concurrency))
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Default, Clone, Copy, Debug)]
@@ -82,6 +91,7 @@ pub(crate) enum ScenarioKind {
     Once,
     Tps(u32),
     Saturate(f64),
+    Direct(u32, usize),
 }
 
 /// Load test scenario structure
@@ -208,6 +218,14 @@ impl Scenario {
         self
     }
 
+    /// Run the scenario with direct control over TPS and concurrency.
+    /// No automatic controls will limit or change any values. This is intended
+    /// for development testing or advanced ussage.
+    pub fn direct(mut self, tps_limit: u32, concurrency: usize) -> Self {
+        self.config.kind = ScenarioKind::Direct(tps_limit, concurrency);
+        self
+    }
+
     /// Run the scenario for the given duration.
     ///
     /// NOTE: Must include one of `.tps()`/`.saturate()`/`.overload()`/`.error_rate()`
@@ -267,5 +285,6 @@ async fn run_scenario(scenario: fn() -> BoxedFut, config: ScenarioConfig) {
         ScenarioKind::Once => scenario().await,
         ScenarioKind::Tps(_) => goal_tps::run_tps(scenario, config).await,
         ScenarioKind::Saturate(_) => saturate::run_saturate(scenario, config).await,
+        ScenarioKind::Direct(_, _) => direct::run_direct(scenario, config).await,
     }
 }
