@@ -75,7 +75,7 @@ where
             tps_limit,
 
             tasks: vec![],
-            interval: interval(Duration::from_millis(30)),
+            interval: interval(Duration::from_millis(200)),
             last_tick: Instant::now(),
 
             success_count: Arc::new(AtomicU64::new(0)),

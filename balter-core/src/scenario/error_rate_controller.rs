@@ -1,5 +1,5 @@
 use super::concurrency_controller::ConcurrencyController;
-use crate::sampling::tps_sampler::TpsData;
+use crate::tps_sampler::TpsData;
 use std::collections::VecDeque;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};

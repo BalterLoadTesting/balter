@@ -2,7 +2,7 @@ use super::error_rate_controller::ErrorRateController;
 use super::ScenarioConfig;
 #[cfg(feature = "rt")]
 use crate::runtime::BALTER_OUT;
-use crate::sampling::tps_sampler::TpsSampler;
+use crate::tps_sampler::TpsSampler;
 use std::future::Future;
 use std::num::NonZeroU32;
 #[allow(unused_imports)]

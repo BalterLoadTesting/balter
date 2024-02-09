@@ -1,5 +1,9 @@
 use balter::prelude::*;
+use reqwest::Client;
+use std::sync::OnceLock;
 use std::time::Duration;
+
+static CLIENT: OnceLock<Client> = OnceLock::new();
 
 use tracing_subscriber::FmtSubscriber;
 
@@ -10,7 +14,7 @@ async fn main() {
         .init();
 
     scenario_a()
-        .tps(5_000)
+        .tps(500_000)
         .duration(Duration::from_secs(120))
         .await;
 }
@@ -22,6 +26,7 @@ async fn scenario_a() {
 
 #[transaction]
 async fn api_a() -> Result<(), reqwest::Error> {
-    reqwest::get("http://0.0.0.0:3000/api_10ms").await?;
+    let client = CLIENT.get_or_init(Client::new);
+    client.get("http://0.0.0.0:3000/delay/ms/10").send().await?;
     Ok(())
 }

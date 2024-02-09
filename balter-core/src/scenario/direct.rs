@@ -1,5 +1,5 @@
 use super::ScenarioConfig;
-use crate::sampling::tps_sampler::TpsSampler;
+use crate::tps_sampler::TpsSampler;
 use humantime::format_duration;
 use std::future::Future;
 use std::num::NonZeroU32;
