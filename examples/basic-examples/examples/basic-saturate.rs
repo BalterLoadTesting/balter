@@ -22,7 +22,7 @@ async fn scenario_a() {
 
 #[transaction]
 async fn api_a() -> Result<()> {
-    let res = reqwest::get("http://0.0.0.0:3000/api_max_tps").await?;
+    let res = reqwest::get("http://0.0.0.0:3000/max/670").await?;
     if res.status().is_server_error() {
         Err(anyhow!("Server error"))
     } else {

@@ -1,12 +1,13 @@
+use crate::tps_sampler::TpsData;
 use std::collections::VecDeque;
 
 #[derive(Debug)]
-pub(crate) struct SampleSet {
-    samples: VecDeque<f64>,
+pub(crate) struct SampleSet<T> {
+    samples: VecDeque<T>,
     window_size: usize,
 }
 
-impl SampleSet {
+impl<T> SampleSet<T> {
     pub fn new(window_size: usize) -> Self {
         Self {
             samples: VecDeque::new(),
@@ -14,7 +15,7 @@ impl SampleSet {
         }
     }
 
-    pub fn push(&mut self, sample: f64) {
+    pub fn push(&mut self, sample: T) {
         self.samples.push_back(sample);
         if self.samples.len() > self.window_size {
             self.samples.pop_front();
@@ -24,7 +25,9 @@ impl SampleSet {
     pub fn clear(&mut self) {
         self.samples.clear();
     }
+}
 
+impl SampleSet<f64> {
     pub fn mean(&self) -> Option<f64> {
         if self.samples.len() == self.window_size {
             let sum: f64 = self.samples.iter().sum();
@@ -42,5 +45,25 @@ impl SampleSet {
         let v = self.samples.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.);
 
         Some(v.sqrt())
+    }
+}
+
+impl SampleSet<TpsData> {
+    pub fn mean_err(&self) -> Option<f64> {
+        if self.samples.len() == self.window_size {
+            let sum: f64 = self.samples.iter().map(TpsData::error_rate).sum();
+            Some(sum / self.samples.len() as f64)
+        } else {
+            None
+        }
+    }
+
+    pub fn mean_tps(&self) -> Option<f64> {
+        if self.samples.len() == self.window_size {
+            let sum: f64 = self.samples.iter().map(TpsData::tps).sum();
+            Some(sum / self.samples.len() as f64)
+        } else {
+            None
+        }
     }
 }

@@ -11,9 +11,7 @@ use std::{
     time::Duration,
 };
 
-mod concurrency_controller;
 mod direct;
-mod error_rate_controller;
 mod goal_tps;
 mod saturate;
 

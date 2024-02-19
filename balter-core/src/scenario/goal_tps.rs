@@ -33,18 +33,16 @@ where
         }
 
         match controller.analyze(sample.tps()) {
+            Message::None | Message::Stable => {}
             Message::AlterConcurrency(val) => {
                 sampler.set_concurrent_count(val);
             }
             Message::TpsLimited(max_tps) => {
-                sampler.set_concurrent_count(controller.concurrency());
                 sampler.set_tps_limit(max_tps);
-                controller.set_goal_tps(max_tps);
 
                 #[cfg(feature = "rt")]
                 distribute_work(&config, start.elapsed(), u32::from(max_tps) as f64).await;
             }
-            Message::None => {}
         }
     }
     sampler.wait_for_shutdown().await;

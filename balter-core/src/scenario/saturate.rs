@@ -1,10 +1,9 @@
-use super::error_rate_controller::ErrorRateController;
 use super::ScenarioConfig;
+use crate::controllers::error_rate::{ErrorRateController, Message};
 #[cfg(feature = "rt")]
 use crate::runtime::BALTER_OUT;
 use crate::tps_sampler::TpsSampler;
 use std::future::Future;
-use std::num::NonZeroU32;
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
 #[allow(unused_imports)]
@@ -22,37 +21,31 @@ where
 
     let error_rate = config.error_rate().unwrap();
     let mut controller = ErrorRateController::new(error_rate);
-    let mut sampler = TpsSampler::new(
-        scenario,
-        NonZeroU32::new(controller.goal_tps() as u32).unwrap(),
-    );
+    let mut sampler = TpsSampler::new(scenario, controller.tps_limit());
+    sampler.set_concurrent_count(controller.concurrency());
 
-    let mut underpowered = false;
-
-    // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
     loop {
         let sample = sampler.sample_tps().await;
         if start.elapsed() > config.duration {
             break;
         }
 
-        controller.push(sample);
-        sampler.set_tps_limit(NonZeroU32::new(controller.goal_tps() as u32).unwrap());
-        sampler.set_concurrent_count(controller.concurrency_count() as usize);
+        match controller.analyze(sample) {
+            Message::None | Message::Stable => {}
+            Message::AlterConcurrency(val) => {
+                sampler.set_concurrent_count(val);
+            }
+            Message::AlterTpsLimit(val) => {
+                sampler.set_tps_limit(val);
+            }
+            Message::TpsLimited(max_tps) => {
+                sampler.set_tps_limit(max_tps);
 
-        if !underpowered && controller.is_underpowered() {
-            underpowered = true;
-
-            #[cfg(not(feature = "rt"))]
-            error!("Current server is not powerful enough to reach TPS required to achieve error rate.");
-
-            #[cfg(feature = "rt")]
-            distribute_work(&config, start.elapsed()).await;
+                #[cfg(feature = "rt")]
+                distribute_work(&config, start.elapsed()).await;
+            }
         }
     }
-    sampler.wait_for_shutdown().await;
-
-    info!("Scenario complete");
 }
 
 #[cfg(feature = "rt")]
