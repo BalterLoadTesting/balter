@@ -1,5 +1,6 @@
 use axum::{extract::Path, http::StatusCode, routing::get, Router};
 use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
+use metrics_exporter_prometheus::PrometheusBuilder;
 use lazy_static::lazy_static;
 use std::{
     num::NonZeroU32,
@@ -9,24 +10,33 @@ use std::{
     },
     time::Duration,
 };
+use metrics::{histogram, gauge, counter};
+use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() {
+    PrometheusBuilder::new()
+        .with_http_listener("0.0.0.0:3001".parse::<SocketAddr>().unwrap())
+        .install()
+        .unwrap();
+
     tokio::task::spawn(async { tps_measure_task().await });
 
     let app = Router::new()
         .route("/api_10ms", get(get_10ms))
         .route("/api_max_tps", get(get_max_tps))
         .route("/delay/ms/:delay_ms", get(delay))
-        .route("/max/:max_tps", get(max));
+        .route("/max/:max_tps", get(max))
+        .route("/limited/:max_tps", get(limited));
 
-    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+    axum::Server::bind(&"0.0.0.0:3002".parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();
 }
 
 async fn delay(Path(delay_ms): Path<u64>) {
+    counter!("mock-server.tps").increment(1);
     TPS_MEASURE.fetch_add(1, Ordering::Relaxed);
     tokio::time::sleep(Duration::from_millis(delay_ms)).await;
 }
@@ -34,14 +44,36 @@ async fn delay(Path(delay_ms): Path<u64>) {
 async fn max(Path(max_tps): Path<u32>) -> Result<(), StatusCode> {
     static LIMITER: OnceLock<DefaultDirectRateLimiter> = OnceLock::new();
 
+
     TPS_MEASURE.fetch_add(1, Ordering::Relaxed);
+    tokio::time::sleep(Duration::from_millis(10)).await;
 
     let limiter = LIMITER
         .get_or_init(|| RateLimiter::direct(Quota::per_second(NonZeroU32::new(max_tps).unwrap())));
     match limiter.check() {
-        Ok(_) => Ok(()),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Ok(_) => {
+            counter!("mock-server.ok").increment(1);
+            Ok(())
+        }
+        Err(_) => {
+            counter!("mock-server.err").increment(1);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
+}
+
+async fn limited(Path(max_tps): Path<u32>) -> Result<(), StatusCode> {
+    static LIMITER: OnceLock<DefaultDirectRateLimiter> = OnceLock::new();
+
+    TPS_MEASURE.fetch_add(1, Ordering::Relaxed);
+
+    let limiter = LIMITER
+        .get_or_init(|| RateLimiter::direct(Quota::per_second(NonZeroU32::new(max_tps).unwrap())));
+
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    limiter.until_ready().await;
+    counter!("mock-server.tps").increment(1);
+    Ok(())
 }
 
 /** Legacy; TODO: cleanup tests and move to new format **/
@@ -77,5 +109,6 @@ async fn tps_measure_task() {
         tokio::time::sleep(Duration::from_millis(1000)).await;
         let transactions = TPS_MEASURE.fetch_min(0, Ordering::Relaxed);
         println!("{transactions} TPS");
+        //histogram!("mock-server.tps").record(transactions as f64);
     }
 }

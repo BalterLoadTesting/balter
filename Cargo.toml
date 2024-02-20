@@ -9,6 +9,7 @@ members = [
 exclude = [
     "balter-benchmark",
     "playground",
+    "rust-talk-feb-2024",
 ]
 
 resolver = "2"

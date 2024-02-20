@@ -8,6 +8,7 @@ use std::future::Future;
 use std::time::{Duration, Instant};
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
+use metrics::{counter, histogram, gauge};
 
 #[instrument(name="scenario", skip_all, fields(name=config.name))]
 pub(crate) async fn run_saturate<T, F>(scenario: T, config: ScenarioConfig)
@@ -24,21 +25,36 @@ where
     let mut sampler = TpsSampler::new(scenario, controller.tps_limit());
     sampler.set_concurrent_count(controller.concurrency());
 
+    let rate_metric = format!("balter.{}.error_rate", &config.name);
+    let concurrency_label = format!("{}-concurrency", config.name);
+    let goal_label = format!("{}-goal_tps", config.name);
+
+    gauge!(concurrency_label.clone()).set(controller.concurrency() as f64);
+    gauge!(goal_label.clone()).set(controller.tps_limit().get() as f64);
+
     loop {
         let sample = sampler.sample_tps().await;
         if start.elapsed() > config.duration {
             break;
         }
 
+        histogram!(rate_metric.clone()).record(sample.error_rate());
+
         match controller.analyze(sample) {
             Message::None | Message::Stable => {}
             Message::AlterConcurrency(val) => {
+                gauge!(concurrency_label.clone()).set(controller.concurrency() as f64);
+                gauge!(goal_label.clone()).set(controller.tps_limit().get() as f64);
                 sampler.set_concurrent_count(val);
             }
             Message::AlterTpsLimit(val) => {
+                gauge!(concurrency_label.clone()).set(controller.concurrency() as f64);
+                gauge!(goal_label.clone()).set(controller.tps_limit().get() as f64);
                 sampler.set_tps_limit(val);
             }
             Message::TpsLimited(max_tps) => {
+                gauge!(concurrency_label.clone()).set(controller.concurrency() as f64);
+                gauge!(goal_label.clone()).set(controller.tps_limit().get() as f64);
                 sampler.set_tps_limit(max_tps);
 
                 #[cfg(feature = "rt")]
@@ -46,6 +62,9 @@ where
             }
         }
     }
+
+    gauge!(concurrency_label.clone()).set(0.);
+    gauge!(goal_label.clone()).set(0.);
 }
 
 #[cfg(feature = "rt")]

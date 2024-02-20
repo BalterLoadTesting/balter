@@ -9,6 +9,7 @@ use std::num::NonZeroU32;
 use std::time::{Duration, Instant};
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
+use metrics::gauge;
 
 #[instrument(name="scenario", skip_all, fields(name=config.name))]
 pub(crate) async fn run_tps<T, F>(scenario: T, config: ScenarioConfig)
@@ -25,6 +26,11 @@ where
     let mut sampler = TpsSampler::new(scenario, NonZeroU32::new(goal_tps).unwrap());
     sampler.set_concurrent_count(controller.concurrency());
 
+    let metrics_label = format!("{}-concurrency", config.name);
+    let goal_label = format!("{}-goal_tps", config.name);
+    gauge!(metrics_label.clone()).set(controller.concurrency() as f64);
+    gauge!(goal_label.clone()).set(goal_tps as f64);
+
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
     loop {
         let sample = sampler.sample_tps().await;
@@ -35,10 +41,13 @@ where
         match controller.analyze(sample.tps()) {
             Message::None | Message::Stable => {}
             Message::AlterConcurrency(val) => {
+                gauge!(metrics_label.clone()).set(val as f64);
                 sampler.set_concurrent_count(val);
             }
             Message::TpsLimited(max_tps) => {
                 sampler.set_tps_limit(max_tps);
+                gauge!(metrics_label.clone()).set(controller.concurrency() as f64);
+                gauge!(goal_label.clone()).set(max_tps.get() as f64);
 
                 #[cfg(feature = "rt")]
                 distribute_work(&config, start.elapsed(), u32::from(max_tps) as f64).await;
@@ -46,6 +55,8 @@ where
         }
     }
     sampler.wait_for_shutdown().await;
+    gauge!(metrics_label.clone()).set(0.);
+    gauge!(goal_label.clone()).set(0.);
 
     info!("Scenario complete");
 }

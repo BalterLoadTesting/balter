@@ -130,7 +130,7 @@ impl ErrorRateController {
 
     fn analyze_inner(&self) -> Option<AnalyzeResult> {
         let err = self.samples.mean_err()?;
-        trace!("Error rate of {:.2}%", err * 100.);
+        debug!("Error rate of {:.2}%", err * 100.);
 
         let bounds = (self.error_rate - 0.03, self.error_rate + 0.03);
         let bounds = (bounds.0.max(0.), bounds.1.min(0.99));
