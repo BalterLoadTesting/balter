@@ -28,21 +28,21 @@ async fn main() {
 async fn root_scenario() {
     scenario_a()
         .tps(10_000)
-        .duration(Duration::from_secs(45))
+        .duration(Duration::from_secs(60))
         .await;
 
-    sleep(Duration::from_millis(10_000)).await;
+    sleep(Duration::from_millis(12_000)).await;
 
     scenario_a_limited()
         .tps(10_000)
-        .duration(Duration::from_secs(75))
+        .duration(Duration::from_secs(90))
         .await;
 
     sleep(Duration::from_millis(20_000)).await;
 
     scenario_b()
         .saturate()
-        .duration(Duration::from_secs(120))
+        .duration(Duration::from_secs(150))
         .await;
 
     sleep(Duration::from_millis(5000)).await;
@@ -80,7 +80,7 @@ async fn scenario_b() {
 #[transaction]
 async fn transaction_b() -> Result<()> {
     let client = CLIENT.get_or_init(Client::new);
-    let res = client.get("http://0.0.0.0:3002/max/3500").send().await?;
+    let res = client.get("http://0.0.0.0:3002/max/7000").send().await?;
 
     if res.status().is_success() {
         Ok(())
