@@ -15,6 +15,9 @@ mkShell rec {
       clippy
       linuxPackages_latest.perf
       hyperfine
+
+      openssl
+      pkg-config
     ];
 
     RUSTC_VERSION = pkgs.lib.readFile ./rust-toolchain.toml;
