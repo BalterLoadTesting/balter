@@ -5,6 +5,7 @@ prep:
     cargo fmt --all -- --check
     cargo clippy --all-targets -- -D warnings
     cargo test --verbose
+    cargo semver-checks
 
 publish: prep
     cd balter-macros && cargo publish
