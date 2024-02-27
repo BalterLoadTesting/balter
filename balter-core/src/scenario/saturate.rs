@@ -2,6 +2,7 @@ use super::ScenarioConfig;
 use crate::controllers::error_rate::{ErrorRateController, Message};
 #[cfg(feature = "rt")]
 use crate::runtime::BALTER_OUT;
+use crate::stats::RunStatistics;
 use crate::tps_sampler::TpsSampler;
 use std::future::Future;
 #[allow(unused_imports)]
@@ -10,7 +11,7 @@ use std::time::{Duration, Instant};
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 
 #[instrument(name="scenario", skip_all, fields(name=config.name))]
-pub(crate) async fn run_saturate<T, F>(scenario: T, config: ScenarioConfig)
+pub(crate) async fn run_saturate<T, F>(scenario: T, config: ScenarioConfig) -> RunStatistics
 where
     T: Fn() -> F + Send + Sync + 'static + Clone,
     F: Future<Output = ()> + Send,
@@ -45,6 +46,15 @@ where
                 distribute_work(&config, start.elapsed()).await;
             }
         }
+    }
+    sampler.wait_for_shutdown().await;
+
+    info!("Scenario complete");
+
+    RunStatistics {
+        concurrency: controller.concurrency(),
+        goal_tps: controller.tps_limit(),
+        stable: controller.is_stable(),
     }
 }
 

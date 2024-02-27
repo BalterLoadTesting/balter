@@ -10,6 +10,7 @@ cfg_rt! {
 }
 pub(crate) mod controllers;
 pub mod scenario;
+pub mod stats;
 pub(crate) mod tps_sampler;
 #[doc(hidden)]
 pub mod transaction;

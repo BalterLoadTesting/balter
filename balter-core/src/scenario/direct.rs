@@ -1,4 +1,5 @@
 use super::ScenarioConfig;
+use crate::stats::RunStatistics;
 use crate::tps_sampler::TpsSampler;
 use humantime::format_duration;
 use std::future::Future;
@@ -9,7 +10,7 @@ use std::time::{Duration, Instant};
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 
 #[instrument(name="scenario", skip_all, fields(name=config.name))]
-pub(crate) async fn run_direct<T, F>(scenario: T, config: ScenarioConfig)
+pub(crate) async fn run_direct<T, F>(scenario: T, config: ScenarioConfig) -> RunStatistics
 where
     T: Fn() -> F + Send + Sync + 'static + Clone,
     F: Future<Output = ()> + Send,
@@ -19,7 +20,8 @@ where
     let start = Instant::now();
 
     let (goal_tps, concurrency) = config.direct().unwrap();
-    let mut sampler = TpsSampler::new(scenario, NonZeroU32::new(goal_tps).unwrap());
+    let goal_tps = NonZeroU32::new(goal_tps).unwrap();
+    let mut sampler = TpsSampler::new(scenario, goal_tps);
     sampler.set_concurrent_count(concurrency);
 
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
@@ -42,4 +44,10 @@ where
     sampler.wait_for_shutdown().await;
 
     info!("Scenario complete");
+
+    RunStatistics {
+        concurrency,
+        goal_tps,
+        stable: true,
+    }
 }

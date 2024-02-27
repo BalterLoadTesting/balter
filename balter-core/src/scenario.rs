@@ -1,4 +1,5 @@
 //! Scenario logic and constants
+use crate::stats::RunStatistics;
 #[cfg(feature = "rt")]
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
@@ -6,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::{
     future::Future,
+    num::NonZeroU32,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
@@ -95,7 +97,7 @@ pub enum ScenarioKind {
 #[pin_project::pin_project]
 pub struct Scenario<T> {
     func: T,
-    runner_fut: Option<Pin<Box<dyn Future<Output = ()> + Send>>>,
+    runner_fut: Option<Pin<Box<dyn Future<Output = RunStatistics> + Send>>>,
     config: ScenarioConfig,
 }
 
@@ -115,7 +117,7 @@ where
     T: Fn() -> F + Send + 'static + Clone + Sync,
     F: Future<Output = ()> + Send,
 {
-    type Output = ();
+    type Output = RunStatistics;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if self.runner_fut.is_none() {
@@ -165,7 +167,7 @@ pub trait ConfigurableScenario<T: Send>: Future<Output = T> + Sized + Send {
     fn duration(self, duration: Duration) -> Self;
 }
 
-impl<T, F> ConfigurableScenario<()> for Scenario<T>
+impl<T, F> ConfigurableScenario<RunStatistics> for Scenario<T>
 where
     T: Fn() -> F + Send + 'static + Clone + Sync,
     F: Future<Output = ()> + Send,
@@ -309,13 +311,21 @@ where
     }
 }
 
-async fn run_scenario<T, F>(scenario: T, config: ScenarioConfig)
+async fn run_scenario<T, F>(scenario: T, config: ScenarioConfig) -> RunStatistics
 where
     T: Fn() -> F + Send + Sync + 'static + Clone,
     F: Future<Output = ()> + Send,
 {
     match config.kind {
-        ScenarioKind::Once => scenario().await,
+        ScenarioKind::Once => {
+            scenario().await;
+            // TODO: Gather these for a single run
+            RunStatistics {
+                concurrency: 1,
+                goal_tps: NonZeroU32::new(1).unwrap(),
+                stable: true,
+            }
+        }
         ScenarioKind::Tps(_) => goal_tps::run_tps(scenario, config).await,
         ScenarioKind::Saturate(_) => saturate::run_saturate(scenario, config).await,
         ScenarioKind::Direct(_, _) => direct::run_direct(scenario, config).await,

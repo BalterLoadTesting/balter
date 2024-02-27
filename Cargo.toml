@@ -2,6 +2,7 @@
 members = [
     "balter-core",
     "balter-macros",
+    "balter-tests",
     "mock-service",
     "examples/*",
 ]

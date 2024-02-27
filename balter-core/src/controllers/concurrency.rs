@@ -29,7 +29,14 @@ impl ConcurrencyController {
     }
 
     pub fn set_goal_tps(&mut self, goal_tps: NonZeroU32) {
-        self.set_goal_tps_with_concurrency(goal_tps, STARTING_CONCURRENCY_COUNT);
+        let concurrency = if goal_tps > self.goal_tps {
+            self.concurrency
+        } else {
+            // NOTE: There is likely a smarter default here
+            STARTING_CONCURRENCY_COUNT
+        };
+
+        self.set_goal_tps_with_concurrency(goal_tps, concurrency);
     }
 
     fn set_goal_tps_with_concurrency(&mut self, goal_tps: NonZeroU32, concurrency: usize) {
@@ -42,6 +49,14 @@ impl ConcurrencyController {
 
     pub fn concurrency(&self) -> usize {
         self.concurrency
+    }
+
+    pub fn goal_tps(&self) -> NonZeroU32 {
+        self.goal_tps
+    }
+
+    pub fn is_stable(&self) -> bool {
+        matches!(self.state, State::Stable(_))
     }
 
     pub fn analyze(&mut self, sample: f64) -> Message {

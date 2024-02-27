@@ -42,6 +42,10 @@ impl ErrorRateController {
         self.cc.concurrency()
     }
 
+    pub fn is_stable(&self) -> bool {
+        matches!(self.state, State::Stable(_))
+    }
+
     pub fn analyze(&mut self, sample: TpsData) -> Message {
         if sample.total() == 0 {
             error!("No transactions sampled");
@@ -76,7 +80,7 @@ impl ErrorRateController {
             (CMessage::Stable, Some(AnalyzeResult::At)) => {
                 if !matches!(self.state, State::Stable(_)) {
                     debug!(
-                        "ErrorRateController stabalized at {} TPS with {:.2}% error.",
+                        "ErrorRateController stabilized at {} TPS with {:.2}% error.",
                         self.goal_tps,
                         self.samples.mean_err().unwrap() * 100.
                     );
@@ -89,7 +93,7 @@ impl ErrorRateController {
                 self.goal_tps = NonZeroU32::new(self.samples.mean_tps().unwrap() as u32).unwrap();
                 self.cc.set_goal_tps(self.goal_tps);
                 self.clear();
-                trace!("Potentially reached error rate at {} TPS.", self.goal_tps);
+                debug!("Potentially reached error rate at {} TPS.", self.goal_tps);
                 Message::AlterTpsLimit(self.goal_tps)
             }
             (CMessage::None, Some(AnalyzeResult::Under)) => Message::None,
@@ -130,12 +134,10 @@ impl ErrorRateController {
 
     fn analyze_inner(&self) -> Option<AnalyzeResult> {
         let err = self.samples.mean_err()?;
-        trace!("Error rate of {:.2}%", err * 100.);
+        debug!("Measured error rate of {:.2}%", err * 100.);
 
         let bounds = (self.error_rate - 0.03, self.error_rate + 0.03);
         let bounds = (bounds.0.max(0.), bounds.1.min(0.99));
-
-        debug!("Bounds used for comparison: ({}, {})", bounds.0, bounds.1);
 
         Some(match err {
             x if x == 0. => AnalyzeResult::Under,

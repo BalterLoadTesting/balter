@@ -91,11 +91,22 @@ where
         let error_count = self.error_count.swap(0, Ordering::Relaxed);
         let elapsed = self.last_tick.elapsed();
         self.last_tick = Instant::now();
-        TpsData {
+
+        let data = TpsData {
             elapsed,
             success_count,
             error_count,
+        };
+
+        // TODO: We should adjust interval timing based on noise not just sample count.
+        if data.total() > 2_000 {
+            let new_interval = self.interval.period() / 2;
+            self.interval = interval(new_interval);
+            // NOTE: First tick() is always instant
+            self.interval.tick().await;
         }
+
+        data
     }
 
     /// NOTE: Panics when concurrent_count=0

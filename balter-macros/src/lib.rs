@@ -102,7 +102,7 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream, _linkme: bool) -> To
     scen_sig.asyncness = None;
     scen_sig.output = syn::parse(
         quote! {
-            -> impl ::balter::scenario::ConfigurableScenario<()>
+            -> impl ::balter::scenario::ConfigurableScenario<::balter::stats::RunStatistics>
         }
         .into(),
     )

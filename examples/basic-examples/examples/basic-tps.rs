@@ -14,7 +14,7 @@ async fn main() {
         .init();
 
     scenario_a()
-        .tps(500_000)
+        .tps(10_000)
         .duration(Duration::from_secs(120))
         .await;
 }
@@ -27,6 +27,9 @@ async fn scenario_a() {
 #[transaction]
 async fn api_a() -> Result<(), reqwest::Error> {
     let client = CLIENT.get_or_init(Client::new);
-    client.get("http://0.0.0.0:3000/delay/ms/10").send().await?;
+    client
+        .get("http://0.0.0.0:3002/limited/7000/delay/ms/10/server/0")
+        .send()
+        .await?;
     Ok(())
 }

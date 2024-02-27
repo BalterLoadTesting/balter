@@ -2,6 +2,7 @@ use super::ScenarioConfig;
 use crate::controllers::concurrency::{ConcurrencyController, Message};
 #[cfg(feature = "rt")]
 use crate::runtime::BALTER_OUT;
+use crate::stats::RunStatistics;
 use crate::tps_sampler::TpsSampler;
 use std::future::Future;
 use std::num::NonZeroU32;
@@ -11,7 +12,7 @@ use std::time::{Duration, Instant};
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 
 #[instrument(name="scenario", skip_all, fields(name=config.name))]
-pub(crate) async fn run_tps<T, F>(scenario: T, config: ScenarioConfig)
+pub(crate) async fn run_tps<T, F>(scenario: T, config: ScenarioConfig) -> RunStatistics
 where
     T: Fn() -> F + Send + Sync + 'static + Clone,
     F: Future<Output = ()> + Send,
@@ -48,6 +49,12 @@ where
     sampler.wait_for_shutdown().await;
 
     info!("Scenario complete");
+
+    RunStatistics {
+        concurrency: controller.concurrency(),
+        goal_tps: controller.goal_tps(),
+        stable: controller.is_stable(),
+    }
 }
 
 #[cfg(feature = "rt")]
