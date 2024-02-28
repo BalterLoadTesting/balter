@@ -5,8 +5,10 @@ use std::sync::OnceLock;
 use std::time::Duration;
 use tracing_subscriber::FmtSubscriber;
 
-async fn init() {
+pub async fn init() {
     static ONCE_LOCK: OnceLock<()> = OnceLock::new();
+
+    let wait = ONCE_LOCK.get().is_none();
 
     ONCE_LOCK.get_or_init(|| {
         FmtSubscriber::builder()
@@ -18,6 +20,10 @@ async fn init() {
             mock_service::run(addr).await;
         });
     });
+
+    if wait {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
 }
 
 #[tokio::test]

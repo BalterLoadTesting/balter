@@ -19,7 +19,7 @@ use std::{net::SocketAddr, sync::Arc};
 use thiserror::Error;
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
-use tracing::{error, instrument};
+use tracing::{error, instrument, debug};
 
 #[derive(Error, Debug)]
 pub(crate) enum ServerError {
@@ -45,6 +45,7 @@ pub(crate) async fn server_task(port: u16, peers: SharedGossipData) -> Result<()
     let socket_addr: SocketAddr = format!("0.0.0.0:{port}").parse()?;
     let listener = tokio::net::TcpListener::bind(socket_addr).await?;
 
+    debug!("Axum server starting up...");
     axum::serve(listener, app).await?;
 
     Ok(())

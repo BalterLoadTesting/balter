@@ -6,6 +6,7 @@ use crate::{
     gossip::{gossip_task, GossipData},
     scenario::{ScenarioConfig, DistributedScenario},
     server::server_task,
+    stats::RunStatistics,
 };
 use async_channel::{bounded, Receiver, Sender};
 use clap::Parser;
@@ -13,7 +14,10 @@ use lazy_static::lazy_static;
 #[doc(hidden)]
 pub use linkme::distributed_slice;
 use std::{collections::HashMap, net::SocketAddr};
+#[allow(unused)]
 use tracing::{debug, error, info, instrument, Instrument};
+use std::pin::Pin;
+use std::future::Future;
 
 lazy_static! {
     /// Message queue for ingesting work (either from peers or user)
@@ -29,7 +33,7 @@ lazy_static! {
 /// function pointer.
 #[doc(hidden)]
 #[distributed_slice]
-pub static BALTER_SCENARIOS: [(&'static str, fn() -> Box<dyn DistributedScenario<Output=()>>)];
+pub static BALTER_SCENARIOS: [(&'static str, fn() -> Pin<Box<dyn DistributedScenario<Output=RunStatistics>>>)];
 
 const DEFAULT_PORT: u16 = 7621;
 
@@ -108,7 +112,6 @@ impl BalterRuntime {
             .enumerate()
             .map(|(idx, (name, _))| (*name, idx))
             .collect();
-        debug!("Scenario mapping: {:?}", &scenarios);
         run(scenarios, &self).await.unwrap();
     }
 }
@@ -125,10 +128,10 @@ async fn run(scenarios: HashMap<&'static str, usize>, balter: &BalterRuntime) ->
     let gossip_data = GossipData::new(&balter.peers, balter.port).shared();
 
     let gd = gossip_data.clone();
-    tokio::spawn(async move { server_task(port, gd).await }.in_current_span());
+    spawn_or_halt(server_task(port, gd)).await;
 
     let gd = gossip_data.clone();
-    tokio::spawn(async move { gossip_task(gd).await }.in_current_span());
+    spawn_or_halt(gossip_task(gd)).await;
 
     let (_, ref rx) = *BALTER_IN;
     let rx = rx.clone();
@@ -149,4 +152,16 @@ async fn run(scenarios: HashMap<&'static str, usize>, balter: &BalterRuntime) ->
             }
         }
     }
+}
+
+async fn spawn_or_halt<F, R, E>(fut: F)
+where F: Future<Output=Result<R, E>> + Send + 'static
+{
+    tokio::spawn(async move {
+        let res = fut.await;
+        if res.is_err() {
+            error!("Failure in critical service. Shutting down.");
+            std::process::exit(1);
+        }
+    }.in_current_span());
 }

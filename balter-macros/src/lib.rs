@@ -82,7 +82,7 @@ pub fn scenario_linkme(attr: TokenStream, item: TokenStream) -> TokenStream {
     scenario_internal(attr, item, true).into()
 }
 
-fn scenario_internal(_attr: TokenStream, item: TokenStream, _linkme: bool) -> TokenStream2 {
+fn scenario_internal(_attr: TokenStream, item: TokenStream, linkme: bool) -> TokenStream2 {
     let input = syn::parse::<ItemFn>(item).expect("Macro only works on fn() items");
 
     let ItemFn {
@@ -118,11 +118,32 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream, _linkme: bool) -> To
         }
     };
 
-    /* TODO: Uncomment and fix the linkme functionality for the distributed runtime
     if linkme {
+        let mut linkme_sig = sig.clone();
+        let linkme_name = Ident::new(&format!("__balter_distr_{}", sig.ident), Span::call_site());
+        linkme_sig.ident = linkme_name.clone();
+        linkme_sig.asyncness = None;
+        linkme_sig.output = syn::parse(
+            quote! {
+                -> ::core::pin::Pin<Box<dyn ::balter::scenario::DistributedScenario<Output=::balter::stats::RunStatistics>>>
+            }
+            .into(),
+        )
+        .expect("Scenario signature is invalid");
+
+        let static_name = Ident::new(
+            &format!("__BALTER_{}", sig.ident.to_string().to_ascii_uppercase()),
+            Span::call_site(),
+        );
+
         let mut linkme = quote! {
             #[::balter::runtime::distributed_slice(::balter::runtime::BALTER_SCENARIOS)]
-            static #static_name: (&'static str, fn() -> ::balter::scenario::Scenario) = (stringify!(#scen_name), #scen_name);
+            static #static_name: (&'static str, fn() -> ::core::pin::Pin<Box<dyn ::balter::scenario::DistributedScenario<Output=::balter::stats::RunStatistics>>>) = (stringify!(#scen_name), #linkme_name);
+
+            // TODO: This definition can almost certainly merge with the #scen_sig definition
+            #(#attrs)* #vis #linkme_sig {
+                Box::pin(::balter::scenario::Scenario::new(stringify!(#scen_name), #new_name))
+            }
         };
 
         linkme.extend(res);
@@ -130,6 +151,4 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream, _linkme: bool) -> To
     } else {
         res
     }
-    */
-    res
 }

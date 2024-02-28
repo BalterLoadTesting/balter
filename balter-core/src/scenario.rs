@@ -134,30 +134,6 @@ where
     }
 }
 
-#[doc(hidden)]
-pub trait DistributedScenario: Future + Send {
-    /// The strange type-signature is to facilitate treating this as a trait object for the
-    /// distributed functionality.
-    fn set_config(
-        &self,
-        config: ScenarioConfig,
-    ) -> Pin<Box<dyn DistributedScenario<Output = Self::Output>>>;
-}
-
-impl<T, F> DistributedScenario for Scenario<T>
-where
-    T: Fn() -> F + Send + 'static + Clone + Sync,
-    F: Future<Output = ()> + Send,
-{
-    #[allow(unused)]
-    fn set_config(
-        &self,
-        _config: ScenarioConfig,
-    ) -> Pin<Box<dyn DistributedScenario<Output = Self::Output>>> {
-        unimplemented!()
-    }
-}
-
 pub trait ConfigurableScenario<T: Send>: Future<Output = T> + Sized + Send {
     fn saturate(self) -> Self;
     fn overload(self) -> Self;
@@ -308,6 +284,32 @@ where
     fn duration(mut self, duration: Duration) -> Self {
         self.config.duration = duration;
         self
+    }
+}
+
+#[doc(hidden)]
+pub trait DistributedScenario: Future + Send {
+    fn set_config(
+        &self,
+        config: ScenarioConfig,
+    ) -> Pin<Box<dyn DistributedScenario<Output = Self::Output>>>;
+}
+
+impl<T, F> DistributedScenario for Scenario<T>
+where
+    T: Fn() -> F + Send + 'static + Clone + Sync,
+    F: Future<Output = ()> + Send,
+{
+    #[allow(unused)]
+    fn set_config(
+        &self,
+        config: ScenarioConfig,
+    ) -> Pin<Box<dyn DistributedScenario<Output = Self::Output>>> {
+        Box::pin(Scenario {
+            func: self.func.clone(),
+            runner_fut: None,
+            config,
+        })
     }
 }
 
