@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.36.0", features = ["full"] }
-balter = { path = "../balter-core" }
+balter = { path = "../balter" }
 mock-service = { path = "../mock-service" }
 reqwest = "0.11.24"
 anyhow = "1.0.80"

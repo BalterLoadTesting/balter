@@ -102,7 +102,7 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream, linkme: bool) -> Tok
     scen_sig.asyncness = None;
     scen_sig.output = syn::parse(
         quote! {
-            -> impl ::balter::scenario::ConfigurableScenario<::balter::stats::RunStatistics>
+            -> impl ::balter::scenario::ConfigurableScenario<::balter::prelude::RunStatistics>
         }
         .into(),
     )
@@ -125,7 +125,7 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream, linkme: bool) -> Tok
         linkme_sig.asyncness = None;
         linkme_sig.output = syn::parse(
             quote! {
-                -> ::core::pin::Pin<Box<dyn ::balter::scenario::DistributedScenario<Output=::balter::stats::RunStatistics>>>
+                -> ::core::pin::Pin<Box<dyn ::balter::prelude::DistributedScenario<Output=::balter::prelude::RunStatistics>>>
             }
             .into(),
         )
@@ -138,7 +138,7 @@ fn scenario_internal(_attr: TokenStream, item: TokenStream, linkme: bool) -> Tok
 
         let mut linkme = quote! {
             #[::balter::runtime::distributed_slice(::balter::runtime::BALTER_SCENARIOS)]
-            static #static_name: (&'static str, fn() -> ::core::pin::Pin<Box<dyn ::balter::scenario::DistributedScenario<Output=::balter::stats::RunStatistics>>>) = (stringify!(#scen_name), #linkme_name);
+            static #static_name: (&'static str, fn() -> ::core::pin::Pin<Box<dyn ::balter::prelude::DistributedScenario<Output=::balter::prelude::RunStatistics>>>) = (stringify!(#scen_name), #linkme_name);
 
             // TODO: This definition can almost certainly merge with the #scen_sig definition
             #(#attrs)* #vis #linkme_sig {

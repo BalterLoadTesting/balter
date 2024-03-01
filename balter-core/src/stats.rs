@@ -8,7 +8,6 @@ use std::num::NonZeroU32;
 /// TODO:
 /// - Error Rate
 /// - Measured TPS (Quantiles)
-#[non_exhaustive]
 pub struct RunStatistics {
     pub concurrency: usize,
     pub goal_tps: NonZeroU32,

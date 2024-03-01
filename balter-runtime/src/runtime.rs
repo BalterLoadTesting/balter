@@ -3,29 +3,29 @@
 //! This Runtime handles running scenarios and distributing workloads to peers. Currently this
 //! involves spinning up an API server and a gossip protocol task.
 use crate::{
-    gossip::{gossip_task, GossipData},
-    scenario::{ScenarioConfig, DistributedScenario},
+    gossip::{gossip_task, Gossip},
     server::server_task,
-    stats::RunStatistics,
+    DistributedScenario,
 };
 use async_channel::{bounded, Receiver, Sender};
+use balter_core::{config::ScenarioConfig, stats::RunStatistics};
 use clap::Parser;
 use lazy_static::lazy_static;
 #[doc(hidden)]
 pub use linkme::distributed_slice;
+use std::future::Future;
+use std::pin::Pin;
 use std::{collections::HashMap, net::SocketAddr};
 #[allow(unused)]
 use tracing::{debug, error, info, instrument, Instrument};
-use std::pin::Pin;
-use std::future::Future;
 
 lazy_static! {
     /// Message queue for ingesting work (either from peers or user)
-    pub(crate) static ref BALTER_IN: (Sender<ScenarioConfig>, Receiver<ScenarioConfig>) =
+    pub static ref BALTER_IN: (Sender<ScenarioConfig>, Receiver<ScenarioConfig>) =
         bounded(10);
 
     /// Message queue for sending work to other peers
-    pub(crate) static ref BALTER_OUT: (Sender<ScenarioConfig>, Receiver<ScenarioConfig>) =
+    pub static ref BALTER_OUT: (Sender<ScenarioConfig>, Receiver<ScenarioConfig>) =
         bounded(10);
 }
 
@@ -33,7 +33,10 @@ lazy_static! {
 /// function pointer.
 #[doc(hidden)]
 #[distributed_slice]
-pub static BALTER_SCENARIOS: [(&'static str, fn() -> Pin<Box<dyn DistributedScenario<Output=RunStatistics>>>)];
+pub static BALTER_SCENARIOS: [(
+    &'static str,
+    fn() -> Pin<Box<dyn DistributedScenario<Output = RunStatistics>>>,
+)];
 
 const DEFAULT_PORT: u16 = 7621;
 
@@ -54,7 +57,7 @@ struct BalterCli {
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```ignore
 /// use balter::prelude::*;
 ///
 /// #[tokio::main]
@@ -125,13 +128,10 @@ impl Default for BalterRuntime {
 #[instrument(name="balter", skip_all, fields(port=balter.port))]
 async fn run(scenarios: HashMap<&'static str, usize>, balter: &BalterRuntime) -> Result<(), ()> {
     let port = balter.port;
-    let gossip_data = GossipData::new(&balter.peers, balter.port).shared();
+    let gossip = Gossip::new(uuid::Uuid::new_v4(), port);
 
-    let gd = gossip_data.clone();
-    spawn_or_halt(server_task(port, gd)).await;
-
-    let gd = gossip_data.clone();
-    spawn_or_halt(gossip_task(gd)).await;
+    spawn_or_halt(server_task(port, gossip.clone())).await;
+    spawn_or_halt(gossip_task(gossip.clone())).await;
 
     let (_, ref rx) = *BALTER_IN;
     let rx = rx.clone();
@@ -155,13 +155,17 @@ async fn run(scenarios: HashMap<&'static str, usize>, balter: &BalterRuntime) ->
 }
 
 async fn spawn_or_halt<F, R, E>(fut: F)
-where F: Future<Output=Result<R, E>> + Send + 'static
+where
+    F: Future<Output = Result<R, E>> + Send + 'static,
 {
-    tokio::spawn(async move {
-        let res = fut.await;
-        if res.is_err() {
-            error!("Failure in critical service. Shutting down.");
-            std::process::exit(1);
+    tokio::spawn(
+        async move {
+            let res = fut.await;
+            if res.is_err() {
+                error!("Failure in critical service. Shutting down.");
+                std::process::exit(1);
+            }
         }
-    }.in_current_span());
+        .in_current_span(),
+    );
 }

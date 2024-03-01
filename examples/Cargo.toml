@@ -1,11 +1,11 @@
 [package]
-name = "basic-examples"
+name = "examples"
 version = "0.1.0"
 edition = "2021"
 publish = false
 
 [dependencies]
-balter = { path = "../../balter-core" }
+balter = { path = "../balter", features = ["rt"] }
 tokio = { version = "1.29.1", features = ["rt", "rt-multi-thread", "macros"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }

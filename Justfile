@@ -7,9 +7,11 @@ prep:
     cargo test --release
     cargo semver-checks
 
-publish: prep
+publish:
     cd balter-macros && cargo publish
     cd balter-core && cargo publish
+    cd balter-runtime && cargo publish
+    cd balter && cargo publish
 
 basic-tps: mock-service
     cargo build --release --example basic-tps

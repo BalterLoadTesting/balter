@@ -1,14 +1,16 @@
 [workspace]
 members = [
+    "balter",
     "balter-core",
+    "balter-runtime",
     "balter-macros",
-    "balter-tests",
+    "tests",
     "mock-service",
-    "examples/*",
+    "examples",
 ]
 
 exclude = [
-    "balter-benchmark",
+    "benchmark",
     "playground",
 ]
 

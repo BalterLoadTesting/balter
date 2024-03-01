@@ -1,0 +1,39 @@
+[package]
+name = "balter"
+license = "MIT"
+version = "0.4.0"
+edition = "2021"
+authors = ["Byron Wasti <github@byronwasti.com>"]
+homepage = "https://github.com/byronwasti/balter"
+repository = "https://github.com/byronwasti/balter"
+description = "A load/stress testing framework."
+readme = "README.md"
+keywords = ["testing", "distributed", "load-testing"]
+categories = ["development-tools", "concurrency"]
+publish = true
+
+[dependencies]
+arc-swap = "1.6.0"
+balter-macros = { version = "0.2", path = "../balter-macros" }
+balter-core = { version = "0.1", path = "../balter-core" }
+balter-runtime = { version = "0.1", path = "../balter-runtime", optional = true }
+governor = "0.6.0"
+humantime = "2.1.0"
+pin-project = "1.1.2"
+thiserror = "1.0.56"
+tokio = { version = "1.29.1", features = ["rt", "time"] }
+tracing = "0.1.37"
+
+[dev-dependencies]
+rand = { version = "0.8.5", features = ["small_rng"] }
+rand_distr = "0.4.3"
+ntest = "0.9.0"
+tracing-test = "0.2.4"
+linkme = "0.3"
+
+[features]
+rt = ["dep:balter-runtime", "balter-core/rt"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

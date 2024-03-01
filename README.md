@@ -1,1 +1,1 @@
-balter-core/README.md
+balter/README.md

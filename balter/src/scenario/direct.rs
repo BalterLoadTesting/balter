@@ -1,6 +1,6 @@
 use super::ScenarioConfig;
-use crate::stats::RunStatistics;
 use crate::tps_sampler::TpsSampler;
+use balter_core::stats::RunStatistics;
 use humantime::format_duration;
 use std::future::Future;
 use std::num::NonZeroU32;
