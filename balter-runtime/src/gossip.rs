@@ -12,7 +12,7 @@ mod interchange;
 pub(crate) mod message;
 mod protocol;
 
-pub(crate) use data::GossipData;
+pub(crate) use data::{GossipData, PeerInfo};
 pub(crate) use error::GossipError;
 use interchange::GossipStream;
 use message::{Handshake, Message};
@@ -26,11 +26,10 @@ pub(crate) async fn gossip_task(gossip: Gossip) -> Result<(), GossipError> {
     loop {
         interval.tick().await;
 
-        let peer_addr = gossip.data.lock()?.select_random_peer();
-        if let Some(peer_addr) = peer_addr {
-            let url = Url::parse(&format!("ws://{}/ws", peer_addr))?;
-            let (stream, _) = connect_async(url).await?;
-            gossip.request_sync(stream, peer_addr).await?;
+        let peer = { gossip.data.lock()?.select_random_peer() };
+        if let Some(peer) = peer {
+            let stream = peer_stream(&peer).await?;
+            gossip.request_sync(stream, peer.addr).await?;
         } else {
             debug!("No peers to gossip with.");
         }
@@ -40,7 +39,7 @@ pub(crate) async fn gossip_task(gossip: Gossip) -> Result<(), GossipError> {
 #[derive(Clone)]
 pub(crate) struct Gossip {
     server_id: Uuid,
-    data: Arc<Mutex<GossipData>>,
+    pub data: Arc<Mutex<GossipData>>,
 }
 
 impl Gossip {
@@ -59,9 +58,15 @@ impl Gossip {
         let msg: Message<Handshake> = stream.recv().await?;
         match msg.inner() {
             Handshake::Sync => self.receive_sync_request(stream, peer_addr).await,
-            _ => todo!(),
+            Handshake::Help => self.receive_help_request(stream, peer_addr).await,
         }
     }
+}
+
+pub async fn peer_stream(peer: &PeerInfo) -> Result<impl GossipStream, GossipError> {
+    let url = Url::parse(&format!("ws://{}/ws", peer.addr))?;
+    let (stream, _) = connect_async(url).await?;
+    Ok(stream)
 }
 
 #[cfg(test)]

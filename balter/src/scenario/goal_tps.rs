@@ -3,7 +3,7 @@ use crate::controllers::concurrency::{ConcurrencyController, Message};
 use crate::tps_sampler::TpsSampler;
 use balter_core::stats::RunStatistics;
 #[cfg(feature = "rt")]
-use balter_runtime::runtime::BALTER_OUT;
+use balter_runtime::runtime::{BALTER_OUT, RuntimeMessage};
 use std::future::Future;
 use std::num::NonZeroU32;
 #[allow(unused_imports)]
@@ -68,9 +68,7 @@ async fn distribute_work(config: &ScenarioConfig, elapsed: Duration, self_tps: f
     let new_tps = new_config.goal_tps().unwrap() - self_tps as u32;
     new_config.set_goal_tps(new_tps);
 
-    tokio::spawn(async move {
-        let (ref tx, _) = *BALTER_OUT;
-        // TODO: Handle the error case.
-        let _ = tx.send(new_config).await;
-    });
+    let (ref tx, _) = *BALTER_OUT;
+    // TODO: Handle the error case.
+    let _ = tx.send(RuntimeMessage::Help(new_config)).await;
 }

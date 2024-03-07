@@ -3,6 +3,8 @@ use balter_core::{
     config::{ScenarioConfig, ScenarioKind},
     stats::RunStatistics,
 };
+#[cfg(feature = "rt")]
+use balter_runtime::runtime::{BALTER_OUT, RuntimeMessage};
 use std::{
     future::Future,
     num::NonZeroU32,
@@ -246,7 +248,7 @@ where
     T: Fn() -> F + Send + Sync + 'static + Clone,
     F: Future<Output = ()> + Send,
 {
-    match config.kind {
+    let stats = match config.kind {
         ScenarioKind::Once => {
             scenario().await;
             // TODO: Gather these for a single run
@@ -259,5 +261,20 @@ where
         ScenarioKind::Tps(_) => goal_tps::run_tps(scenario, config).await,
         ScenarioKind::Saturate(_) => saturate::run_saturate(scenario, config).await,
         ScenarioKind::Direct(_, _) => direct::run_direct(scenario, config).await,
-    }
+    };
+
+    #[cfg(feature = "rt")]
+    signal_completion().await;
+
+    stats
+}
+
+#[cfg(feature = "rt")]
+async fn signal_completion() {
+    // TODO: We should send which scenario was actually completed so that the runtime can be
+    // intelligent about figuring out if load was alleviated or not.
+
+    let (ref tx, _) = *BALTER_OUT;
+    // TODO: Handle the error case.
+    let _ = tx.send(RuntimeMessage::Finished).await;
 }

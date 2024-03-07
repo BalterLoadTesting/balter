@@ -1,12 +1,14 @@
+use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::hash::{Hash, Hasher};
 use std::net::SocketAddr;
 use uuid::Uuid;
+use tracing::error;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct GossipData {
-    pub peers: HashMap<Uuid, PeerInfo>,
+    pub peers: HashMap<Uuid, PeerInfoPartial>,
     pub server_id: Uuid,
     my_addr: MyAddress,
 }
@@ -14,19 +16,6 @@ pub(crate) struct GossipData {
 impl GossipData {
     pub fn new(server_id: Uuid, port: u16) -> Self {
         let mut peers = HashMap::new();
-        peers.insert(
-            server_id,
-            PeerInfo {
-                state: PeerState::Free,
-
-                // NOTE: This ends up being an interesting problem: what _is_ the address of the
-                // current server? Is there a way to reliably figure that out without pinging another
-                // server? Essentially, we defer figuring this out until the first gossip interaction,
-                // in which case we learn the value.
-                addr: None,
-                version: 1,
-            },
-        );
         Self {
             peers,
             server_id,
@@ -45,34 +34,95 @@ impl GossipData {
         self.peers.extend(other.peers.drain());
     }
 
+    // NOTE: This ends up being an interesting problem: what _is_ the address of the
+    // current server? Is there a way to reliably figure that out without pinging another
+    // server? Essentially, we defer figuring this out until the first gossip interaction,
+    // in which case we learn the value.
     pub fn learn_address(&mut self, mut addr: SocketAddr) {
         if let MyAddress::Unknown { port } = self.my_addr {
-            let info = self
-                .peers
-                .get_mut(&self.server_id)
-                .expect("Own information is not present in State. This is a bug in Balter");
-
             // WebSocket port != server port
             addr.set_port(port);
 
-            info.addr = Some(addr);
+            self.peers.insert(
+                self.server_id,
+                PeerInfoPartial {
+                    state: PeerState::Free,
+
+                    addr,
+                    version: 1,
+                },
+            );
+
             self.my_addr = MyAddress::Known;
         }
     }
 
-    pub fn select_random_peer(&self) -> Option<SocketAddr> {
-        todo!()
+    pub fn select_random_peer(&self) -> Option<PeerInfo> {
+        let mut rng = rand::thread_rng();
+        self.peers
+            .iter()
+            .map(|(id, info)| PeerInfo::from_partial(*info, *id))
+            .choose(&mut rng)
+    }
+
+    pub fn select_free_peer(&self) -> Option<PeerInfo> {
+        let mut rng = rand::thread_rng();
+        self.peers
+            .iter()
+            .filter_map(|(id, info)| {
+                if matches!(info.state, PeerState::Free) {
+                    Some(PeerInfo::from_partial(*info, *id))
+                } else {
+                    None
+                }
+            })
+            .choose(&mut rng)
+    }
+
+    pub fn set_state_free(&mut self) {
+        if let Some(info) = self.peers.get_mut(&self.server_id) {
+            info.state = PeerState::Free;
+        } else {
+            error!("Unable to modify state.");
+        }
+    }
+
+    pub fn set_state_busy(&mut self) {
+        if let Some(info) = self.peers.get_mut(&self.server_id) {
+            info.state = PeerState::Busy;
+        } else {
+            error!("Unable to modify state.");
+        }
     }
 }
 
-#[derive(Hash, PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+#[derive(Hash, PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize)]
 pub(crate) struct PeerInfo {
+    pub server_id: Uuid,
+    pub version: u64,
+    pub addr: SocketAddr,
+    pub state: PeerState,
+}
+
+impl PeerInfo {
+    fn from_partial(partial: PeerInfoPartial, server_id: Uuid) -> PeerInfo {
+        PeerInfo {
+            server_id,
+            version: partial.version,
+            addr: partial.addr,
+            state: partial.state,
+        }
+    }
+}
+
+#[derive(Hash, PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
+struct PeerInfoPartial {
     version: u64,
-    addr: Option<SocketAddr>,
+    addr: SocketAddr,
     state: PeerState,
 }
 
-#[derive(Hash, PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+#[derive(Hash, PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub(crate) enum PeerState {
     Busy,
     Free,

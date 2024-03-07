@@ -1,5 +1,6 @@
 pub mod runtime;
 
+mod error;
 mod gossip;
 mod server;
 pub mod traits;

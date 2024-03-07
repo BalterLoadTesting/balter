@@ -3,9 +3,10 @@
 //! This Runtime handles running scenarios and distributing workloads to peers. Currently this
 //! involves spinning up an API server and a gossip protocol task.
 use crate::{
-    gossip::{gossip_task, Gossip},
+    gossip::{gossip_task, Gossip, peer_stream},
     server::server_task,
     DistributedScenario,
+    error::RuntimeError,
 };
 use async_channel::{bounded, Receiver, Sender};
 use balter_core::{config::ScenarioConfig, stats::RunStatistics};
@@ -19,13 +20,14 @@ use std::{collections::HashMap, net::SocketAddr};
 #[allow(unused)]
 use tracing::{debug, error, info, instrument, Instrument};
 
-lazy_static! {
-    /// Message queue for ingesting work (either from peers or user)
-    pub static ref BALTER_IN: (Sender<ScenarioConfig>, Receiver<ScenarioConfig>) =
-        bounded(10);
+mod message;
 
+pub use message::RuntimeMessage;
+
+// TODO: This doesn't need to be a global, and can be threaded into each Scenario via task_local.
+lazy_static! {
     /// Message queue for sending work to other peers
-    pub static ref BALTER_OUT: (Sender<ScenarioConfig>, Receiver<ScenarioConfig>) =
+    pub static ref BALTER_OUT: (Sender<RuntimeMessage>, Receiver<RuntimeMessage>) =
         bounded(10);
 }
 
@@ -73,6 +75,12 @@ pub struct BalterRuntime {
     peers: Vec<SocketAddr>,
 }
 
+impl Default for BalterRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BalterRuntime {
     pub fn new() -> Self {
         BalterRuntime {
@@ -109,47 +117,63 @@ impl BalterRuntime {
         self
     }
 
+    #[instrument(name="balter", skip_all, fields(port=self.port))]
     pub async fn run(self) {
-        let scenarios: HashMap<_, _> = BALTER_SCENARIOS
-            .iter()
-            .enumerate()
-            .map(|(idx, (name, _))| (*name, idx))
-            .collect();
-        run(scenarios, &self).await.unwrap();
+        let gossip = Gossip::new(uuid::Uuid::new_v4(), self.port);
+
+        spawn_or_halt(server_task(self.port, gossip.clone())).await;
+        // TODO: We need to use the trait-variant crate to make the GossipImpl Send
+        //spawn_or_halt(gossip_task(gossip.clone())).await;
+        //spawn_or_halt(helper_task(gossip.clone())).await;
     }
 }
 
-impl Default for BalterRuntime {
-    fn default() -> Self {
-        Self::new()
-    }
+pub(crate) async fn spawn_scenario(config: ScenarioConfig) -> Result<(), RuntimeError> {
+    // TODO: We probably don't want to rebuild this every time.
+    let scenarios: HashMap<_, _> = BALTER_SCENARIOS
+        .iter()
+        .enumerate()
+        .map(|(idx, (name, _))| (*name, idx))
+        .collect();
+
+    let idx = scenarios.get(config.name.as_str()).ok_or(RuntimeError::NoScenario)?;
+    info!("Running scenario {}.", &config.name);
+    let scenario = BALTER_SCENARIOS[*idx];
+    let fut = scenario.1().set_config(config);
+    tokio::spawn(
+        async move {
+            fut.await;
+        }
+        .in_current_span(),
+        );
+    Ok(())
 }
 
-#[instrument(name="balter", skip_all, fields(port=balter.port))]
-async fn run(scenarios: HashMap<&'static str, usize>, balter: &BalterRuntime) -> Result<(), ()> {
-    let port = balter.port;
-    let gossip = Gossip::new(uuid::Uuid::new_v4(), port);
-
-    spawn_or_halt(server_task(port, gossip.clone())).await;
-    spawn_or_halt(gossip_task(gossip.clone())).await;
-
-    let (_, ref rx) = *BALTER_IN;
+async fn helper_task(gossip: Gossip) -> Result<(), RuntimeError> {
+    let (_, ref rx) = *BALTER_OUT;
     let rx = rx.clone();
     loop {
-        if let Ok(config) = rx.recv().await {
-            if let Some(idx) = scenarios.get(config.name.as_str()) {
-                info!("Running scenario {}.", &config.name);
-                let scenario = BALTER_SCENARIOS[*idx];
-                let fut = scenario.1().set_config(config);
-                tokio::spawn(
-                    async move {
-                        fut.await;
+        if let Ok(msg) = rx.recv().await {
+
+            match msg {
+                RuntimeMessage::Help(config) => {
+                    // TODO: The internal `data` probably shouldn't be exposed like this.
+                    let peer = {
+                        let mut data = gossip.data.lock()?;
+                        data.set_state_busy();
+                        data.select_free_peer()
+                    };
+                    if let Some(peer) = peer {
+                        let stream = peer_stream(&peer).await?;
+                        gossip.request_help(stream, peer.addr, config).await;
                     }
-                    .in_current_span(),
-                );
-            } else {
-                error!("No scenario with name \"{}\" exists.", &config.name);
+                }
+                RuntimeMessage::Finished => {
+                    gossip.data.lock()?.set_state_free();
+                }
             }
+        } else {
+            return Err(RuntimeError::ChannelClosed);
         }
     }
 }

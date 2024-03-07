@@ -3,7 +3,7 @@ use crate::controllers::error_rate::{ErrorRateController, Message};
 use crate::tps_sampler::TpsSampler;
 use balter_core::stats::RunStatistics;
 #[cfg(feature = "rt")]
-use balter_runtime::runtime::BALTER_OUT;
+use balter_runtime::runtime::{BALTER_OUT, RuntimeMessage};
 use std::future::Future;
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
@@ -71,6 +71,6 @@ async fn distribute_work(config: &ScenarioConfig, elapsed: Duration) {
     tokio::spawn(async move {
         let (ref tx, _) = *BALTER_OUT;
         // TODO: Handle the error case.
-        let _ = tx.send(new_config).await;
+        let _ = tx.send(RuntimeMessage::Help(new_config)).await;
     });
 }

@@ -11,13 +11,15 @@ impl Gossip {
     ) -> Result<(), GossipError> {
         stream.send(Message::sync()).await?;
 
-        let hash = self.data.lock()?.hash();
+        let hash = { self.data.lock()?.hash() };
         stream
             .send(Message::syn(&self.server_id, hash, peer_addr))
             .await?;
 
         let msg: Message<Ack> = stream.recv().await?;
-        self.data.lock()?.learn_address(msg.addr());
+        {
+            self.data.lock()?.learn_address(msg.addr());
+        }
         if msg.hash() == hash {
             stream.send(Message::fin()).await?;
             return Ok(());

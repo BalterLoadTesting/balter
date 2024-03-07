@@ -1,5 +1,4 @@
-use crate::{gossip::Gossip, runtime::BALTER_IN};
-use async_channel::Sender;
+use crate::{error::RuntimeError, gossip::Gossip, runtime::spawn_scenario};
 use axum::{
     extract::{
         connect_info::ConnectInfo,
@@ -28,12 +27,10 @@ pub(crate) enum ServerError {
 }
 
 pub(crate) async fn server_task(port: u16, gossip: Gossip) -> Result<(), ServerError> {
-    let (ref runtime_tx, _) = *BALTER_IN;
-    let runtime_tx = runtime_tx.clone();
-    let state = ServerState { runtime_tx, gossip };
+    let state = ServerState { gossip };
 
     let app = Router::new()
-        .route("/run", post(run_scenario))
+        .route("/run", post(run))
         .route("/ws", get(ws))
         .with_state(Arc::new(state))
         .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
@@ -49,38 +46,46 @@ pub(crate) async fn server_task(port: u16, gossip: Gossip) -> Result<(), ServerE
 }
 
 struct ServerState {
-    runtime_tx: Sender<ScenarioConfig>,
     gossip: Gossip,
 }
 
 #[derive(Error, Debug)]
 enum HandlerError {
     #[error("Channel send error (Balter runtime has likely fallen over): {0}")]
-    SendError(#[from] async_channel::SendError<ScenarioConfig>),
+    Send(#[from] async_channel::SendError<ScenarioConfig>),
+
+    #[error("Runtime error: {0}")]
+    Runtime(#[from] RuntimeError),
 }
 
 impl IntoResponse for HandlerError {
     fn into_response(self) -> Response {
         use HandlerError::*;
         match self {
-            SendError(err) => (
+            Runtime(RuntimeError::NoScenario) => {
+                (StatusCode::NOT_FOUND, format!("Scenario not found"))
+            }
+            Send(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Internal error: {err:?}"),
+            ),
+            Runtime(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Runtime error: {err:?}"),
             ),
         }
         .into_response()
     }
 }
 
-#[instrument(skip(state))]
-async fn run_scenario(
-    State(state): State<Arc<ServerState>>,
+#[instrument(skip(_state))]
+async fn run(
+    State(_state): State<Arc<ServerState>>,
     Json(scenario): Json<ScenarioConfig>,
 ) -> Result<String, HandlerError> {
     let output = format!("Running scenario {}", &scenario.name);
 
-    // TODO: Query runtime statistics to ensure this server can handle additional load.
-    state.runtime_tx.send(scenario).await?;
+    spawn_scenario(scenario).await?;
 
     Ok(output)
 }
