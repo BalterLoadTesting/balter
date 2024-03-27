@@ -4,6 +4,7 @@ mod tests {
     use balter::prelude::*;
     use reqwest::Client;
     use std::net::SocketAddr;
+    use std::num::NonZeroU32;
     use std::sync::OnceLock;
     use std::time::Duration;
     use tracing_subscriber::FmtSubscriber;
@@ -34,11 +35,11 @@ mod tests {
         init().await;
 
         let stats = scenario_1ms_delay()
-            .tps(10_000)
+            .tps(NonZeroU32::new(10_000).unwrap())
             .duration(Duration::from_secs(30))
             .await;
 
-        assert_eq!(stats.goal_tps.get(), 10_000);
+        assert_eq!(stats.tps.get(), 10_000);
         assert!(stats.concurrency >= 10);
     }
 
@@ -47,11 +48,11 @@ mod tests {
         init().await;
 
         let stats = scenario_1ms_limited_7000()
-            .tps(10_000)
+            .tps(NonZeroU32::new(10_000).unwrap())
             .duration(Duration::from_secs(60))
             .await;
 
-        assert!(dbg!(stats.goal_tps.get()) <= 7_100);
+        assert!(dbg!(stats.tps.get()) <= 7_100);
         assert!(stats.concurrency >= 10);
     }
 
@@ -64,8 +65,8 @@ mod tests {
             .duration(Duration::from_secs(60))
             .await;
 
-        assert!(dbg!(stats.goal_tps.get()) <= 2_300);
-        assert!(dbg!(stats.goal_tps.get()) >= 1_900);
+        assert!(dbg!(stats.tps.get()) <= 2_300);
+        assert!(dbg!(stats.tps.get()) >= 1_900);
         assert!(stats.concurrency >= 2);
     }
 

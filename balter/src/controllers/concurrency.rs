@@ -1,30 +1,25 @@
-use crate::controllers::sample_set::SampleSet;
-use std::collections::HashMap;
+use balter_core::SampleSet;
+
 use std::num::NonZeroU32;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, trace};
 
 // TODO: Does it make more sense to have this as CPU count?
 const STARTING_CONCURRENCY_COUNT: usize = 4;
-const WINDOW_SIZE: usize = 20;
 const MAX_CHANGE: usize = 100;
 
 #[derive(Debug)]
 pub(crate) struct ConcurrencyController {
-    samples: SampleSet<f64>,
-    prev_measurements: HashMap<usize, f64>,
+    prev_measurements: Vec<Measurement>,
     concurrency: usize,
     goal_tps: NonZeroU32,
-    state: State,
 }
 
 impl ConcurrencyController {
     pub fn new(goal_tps: NonZeroU32) -> Self {
         Self {
-            samples: SampleSet::new(WINDOW_SIZE),
-            prev_measurements: HashMap::new(),
+            prev_measurements: Vec::new(),
             concurrency: STARTING_CONCURRENCY_COUNT,
             goal_tps,
-            state: State::Active,
         }
     }
 
@@ -41,60 +36,18 @@ impl ConcurrencyController {
 
     fn set_goal_tps_with_concurrency(&mut self, goal_tps: NonZeroU32, concurrency: usize) {
         self.goal_tps = goal_tps;
-        self.samples.clear();
         self.prev_measurements.clear();
         self.concurrency = concurrency;
-        self.state = State::Active;
     }
 
+    #[allow(unused)]
     pub fn concurrency(&self) -> usize {
         self.concurrency
     }
 
-    pub fn goal_tps(&self) -> NonZeroU32 {
-        self.goal_tps
-    }
-
-    pub fn is_stable(&self) -> bool {
-        matches!(self.state, State::Stable(_))
-    }
-
-    pub fn analyze(&mut self, sample: f64) -> Message {
-        if sample == 0. {
-            error!("No TPS sampled");
-            return Message::None;
-        }
-
-        self.samples.push(sample);
-
-        match self.analyze_inner() {
-            Some(AnalyzeResult::Stable) => {
-                if !matches!(self.state, State::Stable(_)) {
-                    info!("TPS stable at {}", self.samples.mean().unwrap());
-                    self.state = State::Stable(0);
-                }
-                Message::Stable
-            }
-            Some(AnalyzeResult::AlterConcurrency(val)) => {
-                self.samples.clear();
-                self.concurrency = val;
-                debug!("Adjusting concurrency to {}", self.concurrency);
-                Message::AlterConcurrency(val)
-            }
-            Some(AnalyzeResult::TpsLimited(tps_limit, concurrency)) => {
-                self.set_goal_tps_with_concurrency(tps_limit, concurrency);
-                warn!(
-                    "TPS is limited to {}, at {} concurrency",
-                    tps_limit, self.concurrency
-                );
-                Message::TpsLimited(tps_limit)
-            }
-            None => Message::None,
-        }
-    }
-
-    fn analyze_inner(&mut self) -> Option<AnalyzeResult> {
-        let mean_tps = self.samples.mean()?;
+    pub fn analyze(&mut self, samples: &SampleSet) -> CCOutcome {
+        // TODO: Properly handle this error rather than panic
+        let mean_tps = samples.mean_tps().expect("Invalid number of samples.");
         let measurement = Measurement {
             concurrency: self.concurrency,
             tps: mean_tps,
@@ -111,10 +64,9 @@ impl ConcurrencyController {
         if error < 0.05 {
             // NOTE: We don't really care about the negative case, since we're relying on the
             // RateLimiter to handle that situation.
-            Some(AnalyzeResult::Stable)
+            CCOutcome::Stable
         } else {
-            self.prev_measurements
-                .insert(self.concurrency, measurement.tps);
+            self.prev_measurements.push(measurement);
 
             let adjustment = goal_tps / measurement.tps;
             trace!(
@@ -138,34 +90,34 @@ impl ConcurrencyController {
 
             if new_concurrency == 0 {
                 error!("Error in the ConcurrencyController.");
-                None
+                self.concurrency = STARTING_CONCURRENCY_COUNT;
+                CCOutcome::AlterConcurrency(self.concurrency)
             } else if let Some((max_tps, concurrency)) = self.detect_underpowered() {
-                Some(AnalyzeResult::TpsLimited(max_tps, concurrency))
+                self.concurrency = concurrency;
+                CCOutcome::TpsLimited(max_tps, concurrency)
             } else {
-                Some(AnalyzeResult::AlterConcurrency(new_concurrency))
+                self.concurrency = new_concurrency;
+                CCOutcome::AlterConcurrency(new_concurrency)
             }
         }
     }
 
     fn detect_underpowered(&self) -> Option<(NonZeroU32, usize)> {
-        let mut data_points: Vec<Measurement> = self
+        let slopes: Vec<_> = self
             .prev_measurements
-            .iter()
-            .map(|(c, t)| Measurement {
-                concurrency: *c,
-                tps: *t,
-            })
-            .collect();
-
-        data_points.sort_by_key(|f| f.concurrency);
-
-        let slopes: Vec<_> = data_points
             .windows(2)
             .map(|arr| {
                 let m1 = arr[0];
                 let m2 = arr[1];
 
                 let slope = (m2.tps - m1.tps) / (m2.concurrency - m1.concurrency) as f64;
+
+                // NOTE: The controller can get stuck at a given concurrency, and results in NaN.
+                // This is an edge-case of when the controller is limited.
+                if slope.is_nan() {
+                    return 0.;
+                }
+
                 let b = m2.tps - slope * m1.concurrency as f64;
                 trace!(
                     "({}, {:.2}), ({}, {:.2})",
@@ -182,7 +134,7 @@ impl ConcurrencyController {
 
         if slopes.len() > 2 && slopes.iter().rev().take(2).all(|m| *m < 1.) {
             // Grab the minimum concurrency for the max TPS.
-            let x = data_points[data_points.len() - 3];
+            let x = self.prev_measurements[self.prev_measurements.len() - 3];
             let max_tps = NonZeroU32::new(x.tps as u32).unwrap();
             let concurrency = x.concurrency;
             Some((max_tps, concurrency))
@@ -192,22 +144,8 @@ impl ConcurrencyController {
     }
 }
 
-#[derive(Debug)]
-enum State {
-    Active,
-    Stable(usize),
-}
-
 #[derive(Debug, Copy, Clone)]
-pub(crate) enum Message {
-    None,
-    Stable,
-    TpsLimited(NonZeroU32),
-    AlterConcurrency(usize),
-}
-
-#[derive(Debug, Copy, Clone)]
-pub(crate) enum AnalyzeResult {
+pub(crate) enum CCOutcome {
     Stable,
     TpsLimited(NonZeroU32, usize),
     AlterConcurrency(usize),
@@ -222,66 +160,66 @@ struct Measurement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand_distr::{Distribution, Normal};
+    use balter_core::TpsData;
+    use std::num::NonZeroU32;
+    use std::time::Duration;
+
+    pub fn generate_tps(count: usize, tps: u64) -> SampleSet {
+        let mut samples = SampleSet::new(count);
+
+        for _ in 0..count {
+            let success_count = tps;
+            let elapsed = Duration::from_secs(1);
+
+            samples.push(TpsData {
+                success_count,
+                error_count: 0,
+                elapsed,
+            })
+        }
+
+        samples
+    }
 
     #[tracing_test::traced_test]
     #[test]
     fn scales_up() {
-        let mut controller = ConcurrencyController::new(NonZeroU32::new(200).unwrap());
+        let mut c = ConcurrencyController::new(NonZeroU32::new(200).unwrap());
+        let starting_concurrency = c.concurrency();
+        let samples = generate_tps(10, 100);
 
-        let mut normal = Normal::new(9. * STARTING_CONCURRENCY_COUNT as f64, 2.).unwrap();
-        for _ in 0..50 {
-            let v: f64 = normal.sample(&mut rand::thread_rng());
-            match controller.analyze(v) {
-                Message::None | Message::Stable => {}
-                Message::AlterConcurrency(new_val) => {
-                    normal = Normal::new(9. * new_val as f64, 2.).unwrap();
-                }
-                Message::TpsLimited(_) => {
-                    panic!("ConcurrencyController reports TpsLimited incorrectly");
+        match c.analyze(&samples) {
+            CCOutcome::AlterConcurrency(concurrency) => {
+                if concurrency <= starting_concurrency {
+                    panic!("ConcurrencyController did not increase concurrency");
                 }
             }
-
-            if matches!(controller.state, State::Stable(_)) {
-                break;
+            _ => {
+                panic!("Incorrect CCResult");
             }
         }
-
-        assert!(controller.concurrency > 20);
     }
 
     #[tracing_test::traced_test]
     #[test]
     fn limits() {
-        let mut controller = ConcurrencyController::new(NonZeroU32::new(400).unwrap());
+        let mut c = ConcurrencyController::new(NonZeroU32::new(200).unwrap());
+        let samples = generate_tps(10, 100);
 
-        let mut normal = Normal::new(9. * STARTING_CONCURRENCY_COUNT as f64, 2.).unwrap();
-        let mut limited = false;
-        for _ in 0..100 {
-            let v: f64 = normal.sample(&mut rand::thread_rng());
-            match controller.analyze(v) {
-                Message::None | Message::Stable => {}
-                Message::AlterConcurrency(new_val) => {
-                    if new_val > 22 {
-                        normal = Normal::new(9. * 22., 2.).unwrap();
-                    } else {
-                        normal = Normal::new(9. * new_val as f64, 2.).unwrap();
-                    }
-                }
-                Message::TpsLimited(tps) => {
-                    assert!(u32::from(tps) < 220);
-                    assert!(u32::from(tps) > 170);
-                    limited = true;
+        let mut tps_limit = None;
+        for _ in 0..10 {
+            match c.analyze(&samples) {
+                CCOutcome::AlterConcurrency(_) => {}
+                CCOutcome::TpsLimited(max_tps, _) => {
+                    tps_limit = Some(max_tps);
                     break;
                 }
-            }
-
-            if matches!(controller.state, State::Stable(_)) {
-                break;
+                CCOutcome::Stable => {
+                    panic!("Incorrect CCResult");
+                }
             }
         }
 
-        assert!(limited);
-        assert!(controller.concurrency > 20);
+        assert_eq!(tps_limit, Some(NonZeroU32::new(100).unwrap()));
     }
 }

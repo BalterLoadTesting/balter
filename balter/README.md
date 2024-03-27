@@ -110,16 +110,17 @@ You can run scenarios together for more complicated load test scenarios using st
 
 ```rust,ignore
 use balter::prelude::*;
+use std::num::NonZeroU32;
 
 #[scenario]
 async fn my_root_scenario() {
     // In series
-    my_scenario_a().tps(300).duration(Duration::from_secs(120));
+    my_scenario_a().tps(NonZeroU32::new(300).unwrap()).duration(Duration::from_secs(120));
     my_scenario_b().saturate().duration(Duration::from_secs(120));
 
     // In parallel
     tokio::join! {
-        my_scenario_a().tps(300).duration(Duration::from_secs(120)),
+        my_scenario_a().tps(NonZeroU32::new(300).unwrap()).duration(Duration::from_secs(120)),
         my_scenario_b().saturate().duration(Duration::from_secs(120)),
     }
 }
@@ -132,11 +133,12 @@ All put together, a simple single-server load test looks like the following:
 ```rust,no_run
 use balter::prelude::*;
 use std::time::Duration;
+use std::num::NonZeroU32;
 
 #[tokio::main]
 async fn main() {
     my_scenario()
-        .tps(500)
+        .tps(NonZeroU32::new(500).unwrap())
         .duration(Duration::from_secs(30))
         .await;
 
@@ -228,8 +230,6 @@ Consensus is done by sending all information between two nodes and each taking t
 
 ## Developer Notes
 
-The Balter repository is set up to be easy to get started with development. It uses Nix to facilitate the environment setup via `shell.nix` (if you haven't yet drank the Nixaide, open up that file and it will give you an idea of the programs you'll want). The two most important for testing are [just](https://github.com/casey/just) and [cpulimit](https://github.com/opsengine/cpulimit) which are both used for running the test environment. (`Just` simplifies running the test scripts, but isn't actually needed)
+The Balter repository is set up to be easy to get started with development. It uses Nix to facilitate the environment setup via `shell.nix` (if you haven't yet drank the Nixaide, open up that file and it will give you an idea of the programs you'll want).
 
-Balter currently has most of its testing as integration tests, run via `just {test name}` which calls the test scripts in `test-scripts/`. Unfortunately, `cpulimit` is going to be based on the computer you're running on, so it might require tweaking some values in the `test-scripts/`. For a basic test to get you started, `just basic-saturate` will do.
-
-The various integration test scripts all start up a `mock-service` (code in `mock-service/`) which is a simple HTTP server with a few endpoints to make it easier to test various functionality. `/api_10ms` is an endpoint which takes 10ms to respond. `/api_max_tps` is an endpoint which has a set MAX_TPS it accepts before responding with errors (and also coincidentally takes 10ms to respond).
+To run the integration tests, use `cargo test --release --features integration`.

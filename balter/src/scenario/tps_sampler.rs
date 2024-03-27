@@ -1,5 +1,7 @@
+use crate::controllers::{CCOutcome, ConcurrencyController};
 use crate::transaction::{TransactionData, TRANSACTION_HOOK};
 use arc_swap::ArcSwap;
+use balter_core::{SampleSet, TpsData};
 use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use std::future::Future;
 use std::{
@@ -15,39 +17,94 @@ use tokio::time::{interval, Interval};
 #[allow(unused)]
 use tracing::{debug, error, info, trace};
 
-#[derive(Debug, Copy, Clone)]
-pub(crate) struct TpsData {
-    pub success_count: u64,
-    pub error_count: u64,
-    pub elapsed: Duration,
+const SAMPLE_WINDOW_SIZE: usize = 10;
+const SKIP_SIZE: usize = 3;
+
+pub(crate) struct ConcurrentSampler<T> {
+    tps_sampler: TpsSampler<T>,
+    cc: ConcurrencyController,
+    samples: SampleSet,
+    needs_clear: bool,
+    tps_limited: bool,
 }
 
-impl TpsData {
-    #[allow(unused)]
-    pub fn new() -> Self {
+impl<T, F> ConcurrentSampler<T>
+where
+    T: Fn() -> F + Send + Sync + 'static + Clone,
+    F: Future<Output = ()> + Send,
+{
+    pub(crate) fn new(scenario: T, goal_tps: NonZeroU32) -> Self {
         Self {
-            success_count: 0,
-            error_count: 0,
-            elapsed: Duration::new(0, 0),
+            tps_sampler: TpsSampler::new(scenario, goal_tps),
+            cc: ConcurrencyController::new(goal_tps),
+            samples: SampleSet::new(SAMPLE_WINDOW_SIZE).skip_first_n(SKIP_SIZE),
+            needs_clear: false,
+            tps_limited: false,
         }
     }
 
-    pub fn tps(&self) -> f64 {
-        self.total() as f64 / self.elapsed.as_nanos() as f64 * 1e9
+    pub(crate) async fn get_samples(&mut self) -> Option<&SampleSet> {
+        // NOTE: We delay clearing our samples to allow for the various controllers to potentially
+        // lower the goal_tps. For instance, if we haven't reached our GoalTPS but the error rate
+        // is too high, we don't want to adjust the concurrency and clear the data collected -- we
+        // want to reset the goal.
+        if self.needs_clear {
+            info!("Clearing samples");
+            self.samples.clear();
+            self.needs_clear = false;
+        }
+
+        self.samples.push(self.tps_sampler.sample_tps().await);
+
+        if self.samples.full() {
+            match self.cc.analyze(&self.samples) {
+                CCOutcome::Stable => {}
+                CCOutcome::TpsLimited(max_tps, concurrency) => {
+                    self.tps_limited = true;
+                    self.set_concurrency(concurrency);
+                    self.set_goal_tps_unchecked(max_tps);
+                }
+                CCOutcome::AlterConcurrency(concurrency) => {
+                    self.set_concurrency(concurrency);
+                }
+            }
+
+            Some(&self.samples)
+        } else {
+            None
+        }
     }
 
-    pub fn error_rate(&self) -> f64 {
-        self.error_count as f64 / self.total() as f64
+    pub fn set_goal_tps(&mut self, goal_tps: NonZeroU32) {
+        if self.tps_limited && goal_tps > self.tps_sampler.tps_limit {
+            debug!("Unable to set TPS; TPS is limited");
+        } else {
+            self.set_goal_tps_unchecked(goal_tps);
+        }
     }
 
-    pub fn total(&self) -> u64 {
-        self.success_count + self.error_count
+    pub async fn wait_for_shutdown(self) {
+        self.tps_sampler.wait_for_shutdown().await;
+    }
+
+    fn set_concurrency(&mut self, concurrency: usize) {
+        self.needs_clear = true;
+        info!("Setting concurrency to: {concurrency}");
+        self.tps_sampler.set_concurrency(concurrency);
+    }
+
+    fn set_goal_tps_unchecked(&mut self, goal_tps: NonZeroU32) {
+        if goal_tps != self.tps_sampler.tps_limit {
+            self.needs_clear = true;
+            self.cc.set_goal_tps(goal_tps);
+            self.tps_sampler.set_tps_limit(goal_tps);
+        }
     }
 }
 
 pub(crate) struct TpsSampler<T> {
     scenario: T,
-    concurrent_count: Arc<AtomicUsize>,
+    concurrency: Arc<AtomicUsize>,
     limiter: Arc<ArcSwap<DefaultDirectRateLimiter>>,
     tps_limit: NonZeroU32,
 
@@ -70,7 +127,7 @@ where
         let limiter: Arc<ArcSwap<DefaultDirectRateLimiter>> = Arc::new(ArcSwap::new(limiter));
         let mut new_self = Self {
             scenario,
-            concurrent_count: Arc::new(AtomicUsize::new(1)),
+            concurrency: Arc::new(AtomicUsize::new(1)),
             limiter,
             tps_limit,
 
@@ -110,10 +167,9 @@ where
     }
 
     /// NOTE: Panics when concurrent_count=0
-    pub(crate) fn set_concurrent_count(&mut self, concurrent_count: usize) {
-        if concurrent_count != 0 {
-            self.concurrent_count
-                .store(concurrent_count, Ordering::Relaxed);
+    pub(crate) fn set_concurrency(&mut self, concurrency: usize) {
+        if concurrency != 0 {
+            self.concurrency.store(concurrency, Ordering::Relaxed);
             self.populate_jobs();
         } else {
             panic!("Concurrent count is not allowed to be set to 0.");
@@ -128,7 +184,7 @@ where
     }
 
     pub(crate) async fn wait_for_shutdown(mut self) {
-        self.concurrent_count.store(0, Ordering::Relaxed);
+        self.concurrency.store(0, Ordering::Relaxed);
         for task in self.tasks.drain(..) {
             // TODO: Timeout in case a scenario loops indefinitely
             task.await.expect("Task unexpectedly failed.");
@@ -136,7 +192,7 @@ where
     }
 
     fn populate_jobs(&mut self) {
-        let concurrent_count = self.concurrent_count.load(Ordering::Relaxed);
+        let concurrent_count = self.concurrency.load(Ordering::Relaxed);
 
         if self.tasks.len() > concurrent_count {
             // TODO: Clean up the tasks cleanly + timeout/abort in case a scenario loops
@@ -145,7 +201,7 @@ where
         } else {
             while self.tasks.len() < concurrent_count {
                 let scenario = self.scenario.clone();
-                let concurrent_count = self.concurrent_count.clone();
+                let concurrent_count = self.concurrency.clone();
                 let id = self.tasks.len();
                 let transaction_data = TransactionData {
                     // TODO: Use ArcSwap here
@@ -202,7 +258,7 @@ mod tests {
     async fn test_simple_case() {
         let mut tps_sampler =
             TpsSampler::new(mock_trivial_scenario, NonZeroU32::new(1_000).unwrap());
-        tps_sampler.set_concurrent_count(20);
+        tps_sampler.set_concurrency(20);
 
         let _sample = tps_sampler.sample_tps().await;
         for _ in 0..10 {
@@ -218,7 +274,7 @@ mod tests {
     #[ntest::timeout(300)]
     async fn test_noisy_case() {
         let mut tps_sampler = TpsSampler::new(mock_noisy_scenario, NonZeroU32::new(1_000).unwrap());
-        tps_sampler.set_concurrent_count(20);
+        tps_sampler.set_concurrency(20);
 
         let _sample = tps_sampler.sample_tps().await;
         for _ in 0..10 {

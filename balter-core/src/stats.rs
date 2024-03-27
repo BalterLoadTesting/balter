@@ -10,6 +10,6 @@ use std::num::NonZeroU32;
 /// - Measured TPS (Quantiles)
 pub struct RunStatistics {
     pub concurrency: usize,
-    pub goal_tps: NonZeroU32,
+    pub tps: NonZeroU32,
     pub stable: bool,
 }

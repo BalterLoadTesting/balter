@@ -1,4 +1,4 @@
-use balter_core::config::ScenarioConfig;
+use balter_core::ScenarioConfig;
 
 pub enum RuntimeMessage {
     Help(ScenarioConfig),

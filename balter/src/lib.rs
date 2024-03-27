@@ -10,7 +10,6 @@ pub mod transaction;
 pub mod macros;
 
 pub(crate) mod controllers;
-pub(crate) mod tps_sampler;
 
 #[cfg(not(feature = "rt"))]
 pub use balter_macros::{scenario, transaction};
@@ -32,5 +31,5 @@ pub mod prelude {
     #[cfg(not(feature = "rt"))]
     pub use balter_macros::{scenario, transaction};
 
-    pub use balter_core::stats::RunStatistics;
+    pub use balter_core::RunStatistics;
 }

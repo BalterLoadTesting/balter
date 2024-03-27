@@ -1,8 +1,7 @@
-use super::super::{message::Message, Gossip, GossipData, GossipError, GossipStream};
-use balter_core::config::ScenarioConfig;
-use serde::{Deserialize, Serialize};
+use super::super::{message::Message, Gossip, GossipError, GossipStream};
+use balter_core::ScenarioConfig;
+
 use std::net::SocketAddr;
-use uuid::Uuid;
 
 impl Gossip {
     #[allow(unused)]
