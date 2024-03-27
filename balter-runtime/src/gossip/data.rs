@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::hash::{Hash, Hasher};
 use std::net::SocketAddr;
-use uuid::Uuid;
 use tracing::error;
+use uuid::Uuid;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct GossipData {
@@ -15,7 +15,7 @@ pub(crate) struct GossipData {
 
 impl GossipData {
     pub fn new(server_id: Uuid, port: u16) -> Self {
-        let mut peers = HashMap::new();
+        let peers = HashMap::new();
         Self {
             peers,
             server_id,
@@ -116,7 +116,7 @@ impl PeerInfo {
 }
 
 #[derive(Hash, PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
-struct PeerInfoPartial {
+pub(crate) struct PeerInfoPartial {
     version: u64,
     addr: SocketAddr,
     state: PeerState,

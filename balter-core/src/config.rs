@@ -1,8 +1,10 @@
+use crate::BASELINE_TPS;
 #[cfg(feature = "rt")]
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 #[cfg(feature = "rt")]
 use serde_with::{serde_as, DurationSeconds};
+use std::num::NonZeroU32;
 use std::time::Duration;
 
 // TODO: Have a separate builder
@@ -12,63 +14,44 @@ use std::time::Duration;
 #[cfg_attr(feature = "rt", derive(Serialize, Deserialize))]
 pub struct ScenarioConfig {
     pub name: String,
-    #[cfg_attr(feature = "rt", serde_as(as = "DurationSeconds"))]
-    pub duration: Duration,
-    pub kind: ScenarioKind,
+    #[cfg_attr(feature = "rt", serde_as(as = "Option<DurationSeconds>"))]
+    pub duration: Option<Duration>,
+    pub max_tps: Option<NonZeroU32>,
+    pub error_rate: Option<f64>,
+    pub latency: Option<Duration>,
 }
 
 impl ScenarioConfig {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            duration: Default::default(),
-            kind: Default::default(),
+            duration: None,
+            max_tps: None,
+            error_rate: None,
+            latency: None,
         }
     }
 
-    pub fn goal_tps(&self) -> Option<u32> {
-        if let ScenarioKind::Tps(goal_tps) = self.kind {
-            Some(goal_tps)
-        } else {
-            None
+    pub fn starting_tps(&self) -> Option<NonZeroU32> {
+        match self {
+            ScenarioConfig {
+                error_rate: Some(_),
+                ..
+            }
+            | ScenarioConfig {
+                latency: Some(_), ..
+            } => Some(BASELINE_TPS),
+
+            ScenarioConfig {
+                max_tps: Some(tps), ..
+            } => Some(*tps),
+
+            _ => None,
         }
     }
 
     #[allow(unused)]
-    pub fn set_goal_tps(&mut self, new_goal_tps: u32) -> bool {
-        if let ScenarioKind::Tps(goal_tps) = &mut self.kind {
-            *goal_tps = new_goal_tps;
-            true
-        } else {
-            false
-        }
+    pub fn set_max_tps(&mut self, max_tps: NonZeroU32) {
+        self.max_tps = Some(max_tps);
     }
-
-    #[allow(unused)]
-    pub fn error_rate(&self) -> Option<f64> {
-        if let ScenarioKind::Saturate(error_rate) = self.kind {
-            Some(error_rate)
-        } else {
-            None
-        }
-    }
-
-    pub fn direct(&self) -> Option<(u32, usize)> {
-        if let ScenarioKind::Direct(tps, concurrency) = self.kind {
-            Some((tps, concurrency))
-        } else {
-            None
-        }
-    }
-}
-
-#[doc(hidden)]
-#[derive(Default, Clone, Copy, Debug)]
-#[cfg_attr(feature = "rt", derive(Serialize, Deserialize))]
-pub enum ScenarioKind {
-    #[default]
-    Once,
-    Tps(u32),
-    Saturate(f64),
-    Direct(u32, usize),
 }

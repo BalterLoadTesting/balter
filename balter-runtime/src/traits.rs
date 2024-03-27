@@ -1,4 +1,4 @@
-use balter_core::config::ScenarioConfig;
+use balter_core::ScenarioConfig;
 use std::{future::Future, pin::Pin};
 
 #[doc(hidden)]

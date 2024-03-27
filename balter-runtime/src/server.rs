@@ -10,7 +10,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use balter_core::config::ScenarioConfig;
+use balter_core::ScenarioConfig;
 use std::{net::SocketAddr, sync::Arc};
 use thiserror::Error;
 use tower::ServiceBuilder;

@@ -32,5 +32,5 @@ pub mod prelude {
     #[cfg(not(feature = "rt"))]
     pub use balter_macros::{scenario, transaction};
 
-    pub use balter_core::stats::RunStatistics;
+    pub use balter_core::RunStatistics;
 }

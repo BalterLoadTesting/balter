@@ -1,5 +1,6 @@
 use crate::transaction::{TransactionData, TRANSACTION_HOOK};
 use arc_swap::ArcSwap;
+use balter_core::TpsData;
 use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use std::future::Future;
 use std::{
@@ -14,36 +15,6 @@ use tokio::task::JoinHandle;
 use tokio::time::{interval, Interval};
 #[allow(unused)]
 use tracing::{debug, error, info, trace};
-
-#[derive(Debug, Copy, Clone)]
-pub(crate) struct TpsData {
-    pub success_count: u64,
-    pub error_count: u64,
-    pub elapsed: Duration,
-}
-
-impl TpsData {
-    #[allow(unused)]
-    pub fn new() -> Self {
-        Self {
-            success_count: 0,
-            error_count: 0,
-            elapsed: Duration::new(0, 0),
-        }
-    }
-
-    pub fn tps(&self) -> f64 {
-        self.total() as f64 / self.elapsed.as_nanos() as f64 * 1e9
-    }
-
-    pub fn error_rate(&self) -> f64 {
-        self.error_count as f64 / self.total() as f64
-    }
-
-    pub fn total(&self) -> u64 {
-        self.success_count + self.error_count
-    }
-}
 
 pub(crate) struct TpsSampler<T> {
     scenario: T,

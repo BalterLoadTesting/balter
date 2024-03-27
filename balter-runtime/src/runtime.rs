@@ -3,13 +3,13 @@
 //! This Runtime handles running scenarios and distributing workloads to peers. Currently this
 //! involves spinning up an API server and a gossip protocol task.
 use crate::{
-    gossip::{gossip_task, Gossip, peer_stream},
+    error::RuntimeError,
+    gossip::{gossip_task, peer_stream, Gossip},
     server::server_task,
     DistributedScenario,
-    error::RuntimeError,
 };
 use async_channel::{bounded, Receiver, Sender};
-use balter_core::{config::ScenarioConfig, stats::RunStatistics};
+use balter_core::{RunStatistics, ScenarioConfig};
 use clap::Parser;
 use lazy_static::lazy_static;
 #[doc(hidden)]
@@ -122,9 +122,8 @@ impl BalterRuntime {
         let gossip = Gossip::new(uuid::Uuid::new_v4(), self.port);
 
         spawn_or_halt(server_task(self.port, gossip.clone())).await;
-        // TODO: We need to use the trait-variant crate to make the GossipImpl Send
-        //spawn_or_halt(gossip_task(gossip.clone())).await;
-        //spawn_or_halt(helper_task(gossip.clone())).await;
+        spawn_or_halt(gossip_task(gossip.clone())).await;
+        spawn_or_halt(helper_task(gossip.clone())).await;
     }
 }
 
@@ -136,7 +135,9 @@ pub(crate) async fn spawn_scenario(config: ScenarioConfig) -> Result<(), Runtime
         .map(|(idx, (name, _))| (*name, idx))
         .collect();
 
-    let idx = scenarios.get(config.name.as_str()).ok_or(RuntimeError::NoScenario)?;
+    let idx = scenarios
+        .get(config.name.as_str())
+        .ok_or(RuntimeError::NoScenario)?;
     info!("Running scenario {}.", &config.name);
     let scenario = BALTER_SCENARIOS[*idx];
     let fut = scenario.1().set_config(config);
@@ -145,7 +146,7 @@ pub(crate) async fn spawn_scenario(config: ScenarioConfig) -> Result<(), Runtime
             fut.await;
         }
         .in_current_span(),
-        );
+    );
     Ok(())
 }
 
@@ -154,7 +155,6 @@ async fn helper_task(gossip: Gossip) -> Result<(), RuntimeError> {
     let rx = rx.clone();
     loop {
         if let Ok(msg) = rx.recv().await {
-
             match msg {
                 RuntimeMessage::Help(config) => {
                     // TODO: The internal `data` probably shouldn't be exposed like this.
@@ -165,7 +165,13 @@ async fn helper_task(gossip: Gossip) -> Result<(), RuntimeError> {
                     };
                     if let Some(peer) = peer {
                         let stream = peer_stream(&peer).await?;
-                        gossip.request_help(stream, peer.addr, config).await;
+                        let res = gossip.request_help(stream, peer.addr, config).await;
+                        if let Err(error) = res {
+                            error!("Error in gossip protocol: {error:?}");
+                        }
+                    } else {
+                        error!("No Peers available to help.");
+                        // TODO: Implement some form of retry/auto-scaling
                     }
                 }
                 RuntimeMessage::Finished => {

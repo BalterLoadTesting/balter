@@ -1,27 +1,21 @@
 //! Scenario logic and constants
+use crate::controllers::{CompositeController, ConcurrencyController, Controller};
+use crate::tps_sampler::TpsSampler;
 use balter_core::{
-    config::{ScenarioConfig, ScenarioKind},
-    stats::RunStatistics,
+    RunStatistics, SampleSet, ScenarioConfig, DEFAULT_OVERLOAD_ERROR_RATE,
+    DEFAULT_SATURATE_ERROR_RATE,
 };
 #[cfg(feature = "rt")]
-use balter_runtime::runtime::{BALTER_OUT, RuntimeMessage};
+use balter_runtime::runtime::{RuntimeMessage, BALTER_OUT};
 use std::{
     future::Future,
     num::NonZeroU32,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
+    time::{Duration, Instant},
 };
-
-mod direct;
-mod goal_tps;
-mod saturate;
-
-/// The default error rate used for `.saturate()`
-pub const DEFAULT_SATURATE_ERROR_RATE: f64 = 0.03;
-
-/// The default error rate used for `.overload()`
-pub const DEFAULT_OVERLOAD_ERROR_RATE: f64 = 0.80;
+#[allow(unused_imports)]
+use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 
 /// Load test scenario structure
 ///
@@ -70,8 +64,8 @@ pub trait ConfigurableScenario<T: Send>: Future<Output = T> + Sized + Send {
     fn saturate(self) -> Self;
     fn overload(self) -> Self;
     fn error_rate(self, error_rate: f64) -> Self;
-    fn tps(self, tps: u32) -> Self;
-    fn direct(self, tps_limit: u32, concurrency: usize) -> Self;
+    fn tps(self, tps: NonZeroU32) -> Self;
+    //fn direct(self, tps_limit: u32, concurrency: usize) -> Self;
     fn duration(self, duration: Duration) -> Self;
 }
 
@@ -102,7 +96,7 @@ where
     /// }
     /// ```
     fn saturate(mut self) -> Self {
-        self.config.kind = ScenarioKind::Saturate(DEFAULT_SATURATE_ERROR_RATE);
+        self.config.error_rate = Some(DEFAULT_SATURATE_ERROR_RATE);
         self
     }
 
@@ -128,7 +122,7 @@ where
     /// }
     /// ```
     fn overload(mut self) -> Self {
-        self.config.kind = ScenarioKind::Saturate(DEFAULT_OVERLOAD_ERROR_RATE);
+        self.config.error_rate = Some(DEFAULT_OVERLOAD_ERROR_RATE);
         self
     }
 
@@ -154,7 +148,7 @@ where
     /// }
     /// ```
     fn error_rate(mut self, error_rate: f64) -> Self {
-        self.config.kind = ScenarioKind::Saturate(error_rate);
+        self.config.error_rate = Some(error_rate);
         self
     }
 
@@ -170,7 +164,7 @@ where
     /// #[tokio::main]
     /// async fn main() {
     ///     my_scenario()
-    ///         .tps(632)
+    ///         .tps(NonZeroU32::new(632).unwrap())
     ///         .duration(Duration::from_secs(120))
     ///         .await;
     /// }
@@ -179,11 +173,12 @@ where
     /// async fn my_scenario() {
     /// }
     /// ```
-    fn tps(mut self, tps: u32) -> Self {
-        self.config.kind = ScenarioKind::Tps(tps);
+    fn tps(mut self, tps: NonZeroU32) -> Self {
+        self.config.max_tps = Some(tps);
         self
     }
 
+    /*
     /// Run the scenario with direct control over TPS and concurrency.
     /// No automatic controls will limit or change any values. This is intended
     /// for development testing or advanced ussage.
@@ -191,6 +186,7 @@ where
         self.config.kind = ScenarioKind::Direct(tps_limit, concurrency);
         self
     }
+    */
 
     /// Run the scenario for the given duration.
     ///
@@ -214,7 +210,7 @@ where
     /// }
     /// ```
     fn duration(mut self, duration: Duration) -> Self {
-        self.config.duration = duration;
+        self.config.duration = Some(duration);
         self
     }
 }
@@ -243,30 +239,76 @@ mod runtime {
     }
 }
 
-async fn run_scenario<T, F>(scenario: T, config: ScenarioConfig) -> RunStatistics
+const SAMPLE_WINDOW_SIZE: usize = 10;
+
+#[instrument(name="scenario", skip_all, fields(name=config.name))]
+pub(crate) async fn run_scenario<T, F>(scenario: T, config: ScenarioConfig) -> RunStatistics
 where
     T: Fn() -> F + Send + Sync + 'static + Clone,
     F: Future<Output = ()> + Send,
 {
-    let stats = match config.kind {
-        ScenarioKind::Once => {
-            scenario().await;
-            // TODO: Gather these for a single run
-            RunStatistics {
-                concurrency: 1,
-                goal_tps: NonZeroU32::new(1).unwrap(),
-                stable: true,
+    info!("Running {} with config {:?}", config.name, &config);
+
+    let start = Instant::now();
+
+    let mut controllers = CompositeController::new(&config);
+    // NOTE: Special case the concurrency controller because it is always active
+    let mut cc = ConcurrencyController::new(controllers.initial_tps());
+    let mut sampler = TpsSampler::new(scenario, controllers.initial_tps());
+    sampler.set_concurrent_count(cc.concurrency());
+
+    // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
+    let mut samples = SampleSet::new(SAMPLE_WINDOW_SIZE);
+    loop {
+        let sample = sampler.sample_tps().await;
+        samples.push(sample);
+
+        if samples.full() {
+            let _cc_res = cc.analyze(&samples);
+            let goal_tps = controllers.limit(&samples);
+
+            cc.set_goal_tps(goal_tps);
+            sampler.set_tps_limit(goal_tps);
+        }
+
+        if let Some(duration) = config.duration {
+            if start.elapsed() > duration {
+                break;
             }
         }
-        ScenarioKind::Tps(_) => goal_tps::run_tps(scenario, config).await,
-        ScenarioKind::Saturate(_) => saturate::run_saturate(scenario, config).await,
-        ScenarioKind::Direct(_, _) => direct::run_direct(scenario, config).await,
-    };
+    }
+    sampler.wait_for_shutdown().await;
+
+    info!("Scenario complete");
 
     #[cfg(feature = "rt")]
     signal_completion().await;
 
-    stats
+    // TODO: Fix
+    RunStatistics {
+        concurrency: cc.concurrency(),
+        tps: NonZeroU32::new(1).unwrap(),
+        stable: true,
+    }
+}
+
+#[cfg(feature = "rt")]
+async fn distribute_work(_config: &ScenarioConfig, _elapsed: Duration, _self_tps: f64) {
+    /*
+    let mut new_config = config.clone();
+    // TODO: This does not take into account transmission time. Logic will have
+    // to be far fancier to properly time-sync various peers on a single
+    // scenario.
+    new_config.duration = config.duration - elapsed;
+
+    let new_tps = new_config.goal_tps().unwrap() - self_tps as u32;
+    new_config.set_goal_tps(new_tps);
+
+    let (ref tx, _) = *BALTER_OUT;
+    // TODO: Handle the error case.
+    let _ = tx.send(RuntimeMessage::Help(new_config)).await;
+    */
+    todo!()
 }
 
 #[cfg(feature = "rt")]
