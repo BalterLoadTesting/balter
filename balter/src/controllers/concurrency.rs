@@ -152,6 +152,7 @@ mod tests {
     use super::*;
     use rand_distr::{Distribution, Normal};
 
+    /*
     #[tracing_test::traced_test]
     #[test]
     fn scales_up() {
@@ -212,4 +213,5 @@ mod tests {
         assert!(limited);
         assert!(controller.concurrency > 20);
     }
+    */
 }

@@ -110,16 +110,17 @@ You can run scenarios together for more complicated load test scenarios using st
 
 ```rust,ignore
 use balter::prelude::*;
+use std::num::NonZeroU32;
 
 #[scenario]
 async fn my_root_scenario() {
     // In series
-    my_scenario_a().tps(300).duration(Duration::from_secs(120));
+    my_scenario_a().tps(NonZeroU32::new(300).unwrap()).duration(Duration::from_secs(120));
     my_scenario_b().saturate().duration(Duration::from_secs(120));
 
     // In parallel
     tokio::join! {
-        my_scenario_a().tps(300).duration(Duration::from_secs(120)),
+        my_scenario_a().tps(NonZeroU32::new(300).unwrap()).duration(Duration::from_secs(120)),
         my_scenario_b().saturate().duration(Duration::from_secs(120)),
     }
 }
@@ -132,11 +133,12 @@ All put together, a simple single-server load test looks like the following:
 ```rust,no_run
 use balter::prelude::*;
 use std::time::Duration;
+use std::num::NonZeroU32;
 
 #[tokio::main]
 async fn main() {
     my_scenario()
-        .tps(500)
+        .tps(NonZeroU32::new(500).unwrap())
         .duration(Duration::from_secs(30))
         .await;
 

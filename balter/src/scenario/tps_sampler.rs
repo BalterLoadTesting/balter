@@ -253,7 +253,7 @@ mod tests {
     async fn test_simple_case() {
         let mut tps_sampler =
             TpsSampler::new(mock_trivial_scenario, NonZeroU32::new(1_000).unwrap());
-        tps_sampler.set_concurrent_count(20);
+        tps_sampler.set_concurrency(20);
 
         let _sample = tps_sampler.sample_tps().await;
         for _ in 0..10 {
@@ -269,7 +269,7 @@ mod tests {
     #[ntest::timeout(300)]
     async fn test_noisy_case() {
         let mut tps_sampler = TpsSampler::new(mock_noisy_scenario, NonZeroU32::new(1_000).unwrap());
-        tps_sampler.set_concurrent_count(20);
+        tps_sampler.set_concurrency(20);
 
         let _sample = tps_sampler.sample_tps().await;
         for _ in 0..10 {

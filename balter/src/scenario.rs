@@ -162,6 +162,7 @@ where
     /// ```no_run
     /// use balter::prelude::*;
     /// use std::time::Duration;
+    /// use std::num::NonZeroU32;
     ///
     /// #[tokio::main]
     /// async fn main() {
@@ -198,11 +199,12 @@ where
     /// ```no_run
     /// use balter::prelude::*;
     /// use std::time::Duration;
+    /// use std::num::NonZeroU32;
     ///
     /// #[tokio::main]
     /// async fn main() {
     ///     my_scenario()
-    ///         .tps(10)
+    ///         .tps(NonZeroU32::new(10).unwrap())
     ///         .duration(Duration::from_secs(120))
     ///         .await;
     /// }
