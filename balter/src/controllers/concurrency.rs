@@ -1,4 +1,4 @@
-use balter_core::{SampleSet, TpsData};
+use balter_core::SampleSet;
 
 use std::num::NonZeroU32;
 use tracing::{debug, error, trace};
@@ -44,7 +44,7 @@ impl ConcurrencyController {
         self.concurrency
     }
 
-    pub fn analyze(&mut self, samples: &SampleSet<TpsData>) -> AnalyzeResult {
+    pub fn analyze(&mut self, samples: &SampleSet) -> CCResult {
         // TODO: Properly handle this error rather than panic
         let mean_tps = samples.mean_tps().expect("Invalid number of samples.");
         let measurement = Measurement {
@@ -63,7 +63,7 @@ impl ConcurrencyController {
         if error < 0.05 {
             // NOTE: We don't really care about the negative case, since we're relying on the
             // RateLimiter to handle that situation.
-            AnalyzeResult::Stable
+            CCResult::Stable
         } else {
             self.prev_measurements.push(measurement);
 
@@ -90,11 +90,11 @@ impl ConcurrencyController {
             if new_concurrency == 0 {
                 error!("Error in the ConcurrencyController.");
                 self.concurrency = STARTING_CONCURRENCY_COUNT;
-                AnalyzeResult::AlterConcurrency(self.concurrency)
+                CCResult::AlterConcurrency(self.concurrency)
             } else if let Some((max_tps, concurrency)) = self.detect_underpowered() {
-                AnalyzeResult::TpsLimited(max_tps, concurrency)
+                CCResult::TpsLimited(max_tps, concurrency)
             } else {
-                AnalyzeResult::AlterConcurrency(new_concurrency)
+                CCResult::AlterConcurrency(new_concurrency)
             }
         }
     }
@@ -135,7 +135,7 @@ impl ConcurrencyController {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) enum AnalyzeResult {
+pub(crate) enum CCResult {
     Stable,
     TpsLimited(NonZeroU32, usize),
     AlterConcurrency(usize),

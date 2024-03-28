@@ -1,4 +1,4 @@
-use crate::stats::{SampleSet, TpsData};
+use crate::stats::SampleSet;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroU32;
 
@@ -9,5 +9,5 @@ pub trait Controller: Serialize + for<'a> Deserialize<'a> {
 }
 
 pub trait Limiter: Sync + Send {
-    fn analyze(&mut self, samples: SampleSet<TpsData>) -> NonZeroU32;
+    fn analyze(&mut self, samples: SampleSet) -> NonZeroU32;
 }

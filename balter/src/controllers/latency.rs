@@ -1,5 +1,5 @@
 use crate::controllers::Controller;
-use balter_core::{SampleSet, TpsData};
+use balter_core::SampleSet;
 use std::num::NonZeroU32;
 use std::time::Duration;
 
@@ -16,7 +16,7 @@ impl Controller for LatencyController {
         todo!()
     }
 
-    fn limit(&mut self, _samples: &SampleSet<TpsData>) -> NonZeroU32 {
+    fn limit(&mut self, _samples: &SampleSet) -> NonZeroU32 {
         todo!()
     }
 }

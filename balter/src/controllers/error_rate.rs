@@ -1,5 +1,5 @@
 use crate::controllers::Controller;
-use balter_core::{SampleSet, TpsData, BASELINE_TPS};
+use balter_core::{SampleSet, BASELINE_TPS};
 use std::num::NonZeroU32;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
@@ -44,7 +44,7 @@ impl Controller for ErrorRateController {
         BASELINE_TPS
     }
 
-    fn limit(&mut self, samples: &SampleSet<TpsData>) -> NonZeroU32 {
+    fn limit(&mut self, samples: &SampleSet) -> NonZeroU32 {
         // TODO: Remove panic; this can be a type-safe check
         let sample_error_rate = samples.mean_err().expect("Invalid number of samples");
 
@@ -54,11 +54,15 @@ impl Controller for ErrorRateController {
                     self.goal_tps = NonZeroU32::new(self.goal_tps.get() * 2).unwrap();
                     self.goal_tps
                 }
-                State::SmallStep(_step_size) => {
-                    todo!()
+                State::SmallStep(step_ratio) => {
+                    // TODO: Better handling of conversions
+                    let step = (self.goal_tps.get() as f64 * step_ratio).max(1.);
+                    self.goal_tps = NonZeroU32::new(self.goal_tps.get() + step as u32).unwrap();
+                    self.goal_tps
                 }
                 State::Stable => {
-                    todo!()
+                    self.state = State::SmallStep(DEFAULT_SMALL_STEP_SIZE);
+                    self.goal_tps
                 }
             },
             Bounds::At => {
@@ -81,10 +85,11 @@ impl Controller for ErrorRateController {
                         self.goal_tps = NonZeroU32::new(self.goal_tps.get() / 2).unwrap();
                         self.goal_tps
                     }
-                    State::SmallStep(step_size) => {
-                        self.state = State::SmallStep(step_size / 2.);
+                    State::SmallStep(step_ratio) => {
+                        self.state = State::SmallStep(step_ratio / 2.);
 
-                        todo!();
+                        let step = (self.goal_tps.get() as f64 * step_ratio).max(1.);
+                        self.goal_tps = NonZeroU32::new(self.goal_tps.get() - step as u32).unwrap();
 
                         self.goal_tps
                     }

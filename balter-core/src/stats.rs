@@ -47,12 +47,12 @@ impl TpsData {
 }
 
 #[derive(Debug)]
-pub struct SampleSet<T> {
-    samples: VecDeque<T>,
+pub struct SampleSet {
+    samples: VecDeque<TpsData>,
     window_size: usize,
 }
 
-impl<T> SampleSet<T> {
+impl SampleSet {
     pub fn new(window_size: usize) -> Self {
         Self {
             samples: VecDeque::new(),
@@ -60,7 +60,7 @@ impl<T> SampleSet<T> {
         }
     }
 
-    pub fn push(&mut self, sample: T) {
+    pub fn push(&mut self, sample: TpsData) {
         self.samples.push_back(sample);
         if self.samples.len() > self.window_size {
             self.samples.pop_front();
@@ -74,30 +74,7 @@ impl<T> SampleSet<T> {
     pub fn full(&self) -> bool {
         self.samples.len() == self.window_size
     }
-}
 
-impl SampleSet<f64> {
-    pub fn mean(&self) -> Option<f64> {
-        if self.samples.len() == self.window_size {
-            let sum: f64 = self.samples.iter().sum();
-            Some(sum / self.samples.len() as f64)
-        } else {
-            None
-        }
-    }
-
-    #[allow(unused)]
-    pub fn std(&self) -> Option<f64> {
-        let mean = self.mean()?;
-
-        let n = self.samples.len() as f64;
-        let v = self.samples.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.);
-
-        Some(v.sqrt())
-    }
-}
-
-impl SampleSet<TpsData> {
     // TODO: Rather than return Option, we can have a method which returns a "Full" SampleSet with
     // non-optional return values here
     pub fn mean_err(&self) -> Option<f64> {
@@ -118,3 +95,6 @@ impl SampleSet<TpsData> {
         }
     }
 }
+
+#[cfg(test)]
+mod test_utils {}

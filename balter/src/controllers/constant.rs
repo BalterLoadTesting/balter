@@ -1,5 +1,5 @@
 use crate::controllers::Controller;
-use balter_core::{SampleSet, TpsData};
+use balter_core::SampleSet;
 use std::num::NonZeroU32;
 
 pub(crate) struct ConstantController {
@@ -17,7 +17,7 @@ impl Controller for ConstantController {
         self.goal_tps
     }
 
-    fn limit(&mut self, _samples: &SampleSet<TpsData>) -> NonZeroU32 {
+    fn limit(&mut self, _samples: &SampleSet) -> NonZeroU32 {
         self.goal_tps
     }
 }

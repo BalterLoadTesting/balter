@@ -1,4 +1,4 @@
-use crate::controllers::{AnalyzeResult, ConcurrencyController};
+use crate::controllers::{CCResult, ConcurrencyController};
 use crate::transaction::{TransactionData, TRANSACTION_HOOK};
 use arc_swap::ArcSwap;
 use balter_core::{SampleSet, TpsData};
@@ -22,7 +22,7 @@ const SAMPLE_WINDOW_SIZE: usize = 10;
 pub(crate) struct ConcurrentSampler<T> {
     tps_sampler: TpsSampler<T>,
     cc: ConcurrencyController,
-    samples: SampleSet<TpsData>,
+    samples: SampleSet,
     needs_clear: bool,
     tps_limited: bool,
 }
@@ -42,7 +42,7 @@ where
         }
     }
 
-    pub(crate) async fn get_samples(&mut self) -> Option<&SampleSet<TpsData>> {
+    pub(crate) async fn get_samples(&mut self) -> Option<&SampleSet> {
         // NOTE: We delay clearing our samples to allow for the various controllers to potentially
         // lower the goal_tps. For instance, if we haven't reached our GoalTPS but the error rate
         // is too high, we don't want to adjust the concurrency and clear the data collected -- we
@@ -56,13 +56,13 @@ where
 
         if self.samples.full() {
             match self.cc.analyze(&self.samples) {
-                AnalyzeResult::Stable => {}
-                AnalyzeResult::TpsLimited(max_tps, concurrency) => {
+                CCResult::Stable => {}
+                CCResult::TpsLimited(max_tps, concurrency) => {
                     self.tps_limited = true;
                     self.set_concurrency(concurrency);
                     self.set_goal_tps_unchecked(max_tps);
                 }
-                AnalyzeResult::AlterConcurrency(concurrency) => {
+                CCResult::AlterConcurrency(concurrency) => {
                     self.set_concurrency(concurrency);
                 }
             }
