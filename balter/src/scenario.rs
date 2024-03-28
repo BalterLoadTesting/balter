@@ -1,9 +1,7 @@
 //! Scenario logic and constants
-use crate::controllers::{CompositeController, ConcurrencyController, Controller};
-use crate::tps_sampler::TpsSampler;
+use crate::controllers::{CompositeController, Controller};
 use balter_core::{
-    RunStatistics, SampleSet, ScenarioConfig, DEFAULT_OVERLOAD_ERROR_RATE,
-    DEFAULT_SATURATE_ERROR_RATE,
+    RunStatistics, ScenarioConfig, DEFAULT_OVERLOAD_ERROR_RATE, DEFAULT_SATURATE_ERROR_RATE,
 };
 #[cfg(feature = "rt")]
 use balter_runtime::runtime::{RuntimeMessage, BALTER_OUT};
@@ -16,6 +14,10 @@ use std::{
 };
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
+
+mod tps_sampler;
+
+use tps_sampler::ConcurrentSampler;
 
 /// Load test scenario structure
 ///
@@ -239,8 +241,6 @@ mod runtime {
     }
 }
 
-const SAMPLE_WINDOW_SIZE: usize = 10;
-
 #[instrument(name="scenario", skip_all, fields(name=config.name))]
 pub(crate) async fn run_scenario<T, F>(scenario: T, config: ScenarioConfig) -> RunStatistics
 where
@@ -252,23 +252,13 @@ where
     let start = Instant::now();
 
     let mut controllers = CompositeController::new(&config);
-    // NOTE: Special case the concurrency controller because it is always active
-    let mut cc = ConcurrencyController::new(controllers.initial_tps());
-    let mut sampler = TpsSampler::new(scenario, controllers.initial_tps());
-    sampler.set_concurrent_count(cc.concurrency());
+    let mut sampler = ConcurrentSampler::new(scenario, controllers.initial_tps());
 
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
-    let mut samples = SampleSet::new(SAMPLE_WINDOW_SIZE);
     loop {
-        let sample = sampler.sample_tps().await;
-        samples.push(sample);
-
-        if samples.full() {
-            let _cc_res = cc.analyze(&samples);
-            let goal_tps = controllers.limit(&samples);
-
-            cc.set_goal_tps(goal_tps);
-            sampler.set_tps_limit(goal_tps);
+        if let Some(samples) = sampler.get_samples().await {
+            let new_goal_tps = controllers.limit(&samples);
+            sampler.set_goal_tps(new_goal_tps);
         }
 
         if let Some(duration) = config.duration {
@@ -286,7 +276,7 @@ where
 
     // TODO: Fix
     RunStatistics {
-        concurrency: cc.concurrency(),
+        concurrency: 1,
         tps: NonZeroU32::new(1).unwrap(),
         stable: true,
     }
