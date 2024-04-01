@@ -21,6 +21,7 @@ const SAMPLE_WINDOW_SIZE: usize = 10;
 const SKIP_SIZE: usize = 3;
 
 pub(crate) struct ConcurrentSampler<T> {
+    base_label: String,
     tps_sampler: TpsSampler<T>,
     cc: ConcurrencyController,
     samples: SampleSet,
@@ -33,14 +34,21 @@ where
     T: Fn() -> F + Send + Sync + 'static + Clone,
     F: Future<Output = ()> + Send,
 {
-    pub(crate) fn new(scenario: T, goal_tps: NonZeroU32) -> Self {
-        Self {
+    pub(crate) fn new(name: &str, scenario: T, goal_tps: NonZeroU32) -> Self {
+        let new = Self {
+            base_label: format!("balter_{name}"),
             tps_sampler: TpsSampler::new(scenario, goal_tps),
             cc: ConcurrencyController::new(goal_tps),
             samples: SampleSet::new(SAMPLE_WINDOW_SIZE).skip_first_n(SKIP_SIZE),
             needs_clear: false,
             tps_limited: false,
+        };
+
+        if cfg!(feature = "metrics") {
+            new.goal_tps_metric(goal_tps);
         }
+
+        new
     }
 
     pub(crate) async fn get_samples(&mut self) -> Option<&SampleSet> {
@@ -58,14 +66,31 @@ where
 
         if self.samples.full() {
             match self.cc.analyze(&self.samples) {
-                CCOutcome::Stable => {}
+                CCOutcome::Stable => {
+                    if cfg!(feature = "metrics") {
+                        // TODO: Given these metric recordings aren't on the hot-path it is likely
+                        // okay that we allocate for them. But if there is a simple way to avoid it
+                        // that would be preferable.
+                        metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(1);
+                    }
+                }
                 CCOutcome::TpsLimited(max_tps, concurrency) => {
+                    // TODO: There is currently no way to get _out_ of being tps_limited. This may
+                    // or may not be a problem, but it would be good to evaluate other options.
                     self.tps_limited = true;
                     self.set_concurrency(concurrency);
                     self.set_goal_tps_unchecked(max_tps);
+
+                    if cfg!(feature = "metrics") {
+                        metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(2);
+                    }
                 }
                 CCOutcome::AlterConcurrency(concurrency) => {
                     self.set_concurrency(concurrency);
+
+                    if cfg!(feature = "metrics") {
+                        metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(0);
+                    }
                 }
             }
 
@@ -91,6 +116,10 @@ where
         self.needs_clear = true;
         info!("Setting concurrency to: {concurrency}");
         self.tps_sampler.set_concurrency(concurrency);
+
+        if cfg!(feature = "metrics") {
+            metrics::gauge!(format!("{}_concurrency", &self.base_label)).set(concurrency as f64);
+        }
     }
 
     fn set_goal_tps_unchecked(&mut self, goal_tps: NonZeroU32) {
@@ -98,7 +127,16 @@ where
             self.needs_clear = true;
             self.cc.set_goal_tps(goal_tps);
             self.tps_sampler.set_tps_limit(goal_tps);
+
+            if cfg!(feature = "metrics") {
+                self.goal_tps_metric(goal_tps);
+            }
         }
+    }
+
+    #[cfg(feature="metrics")]
+    fn goal_tps_metric(&self, goal_tps: NonZeroU32) {
+        metrics::gauge!(format!("{}_goal_tps", &self.base_label)).set(goal_tps.get());
     }
 }
 

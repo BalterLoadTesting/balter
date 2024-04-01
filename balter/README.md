@@ -232,4 +232,4 @@ Consensus is done by sending all information between two nodes and each taking t
 
 The Balter repository is set up to be easy to get started with development. It uses Nix to facilitate the environment setup via `shell.nix` (if you haven't yet drank the Nixaide, open up that file and it will give you an idea of the programs you'll want).
 
-To run the integration tests, use `cargo test --release --features integration`.
+To run the integration tests, use `cargo test --release --features integration`. In order to easily debug these tests (which oftentimes rely on controller logic operating correctly), it can be useful to have graphs. You can find Grafana dashboards for each test in `dashboards/`, and if you have Prometheus running (using the `prometheus.yml` at the root) and Grafana running (importing the dashboards) you should be set.

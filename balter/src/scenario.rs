@@ -254,13 +254,12 @@ where
     let start = Instant::now();
 
     let mut controllers = CompositeController::new(&config);
-    let mut sampler = ConcurrentSampler::new(scenario, controllers.initial_tps());
+    let mut sampler = ConcurrentSampler::new(&config.name, scenario, controllers.initial_tps());
 
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
     loop {
         if let Some(samples) = sampler.get_samples().await {
             let new_goal_tps = controllers.limit(&samples);
-            info!("New Goal TPS: {new_goal_tps}");
             sampler.set_goal_tps(new_goal_tps);
         }
 

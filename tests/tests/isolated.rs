@@ -50,7 +50,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn single_instance_tps_limited() {
+    async fn single_instance_limited_tps() {
         init().await;
 
         let stats = scenario_1ms_limited_7000()
