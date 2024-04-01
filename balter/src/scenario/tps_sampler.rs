@@ -134,7 +134,7 @@ where
         }
     }
 
-    #[cfg(feature="metrics")]
+    #[cfg(feature = "metrics")]
     fn goal_tps_metric(&self, goal_tps: NonZeroU32) {
         metrics::gauge!(format!("{}_goal_tps", &self.base_label)).set(goal_tps.get());
     }
