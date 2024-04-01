@@ -20,6 +20,10 @@ cfg_rt! {
     pub use balter_macros::{scenario_linkme as scenario, transaction};
 }
 
+pub mod core {
+    pub use balter_core::*;
+}
+
 pub mod prelude {
     pub use crate::scenario::ConfigurableScenario;
     cfg_rt! {

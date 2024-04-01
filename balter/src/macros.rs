@@ -1,6 +1,6 @@
 #![allow(unused_macros)]
-/// Helper macro for appending feature tags to docs.
 
+/// Helper macro for appending feature tags to docs.
 macro_rules! cfg_rt {
     ($($item:item)*) => {
         $(

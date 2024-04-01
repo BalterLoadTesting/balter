@@ -2,6 +2,7 @@
 mod tests {
 
     use balter::prelude::*;
+    use metrics_exporter_prometheus::PrometheusBuilder;
     use reqwest::Client;
     use std::net::SocketAddr;
     use std::num::NonZeroU32;
@@ -18,6 +19,11 @@ mod tests {
             FmtSubscriber::builder()
                 .with_env_filter("balter=debug")
                 .init();
+
+            PrometheusBuilder::new()
+                .with_http_listener("0.0.0.0:8002".parse::<SocketAddr>().unwrap())
+                .install()
+                .unwrap();
 
             tokio::spawn(async {
                 let addr: SocketAddr = "0.0.0.0:3002".parse().unwrap();

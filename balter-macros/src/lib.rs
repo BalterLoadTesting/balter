@@ -33,9 +33,10 @@ fn transaction_internal(_attr: TokenStream, item: TokenStream) -> TokenStream2 {
     } = input;
     let stmts = &block.stmts;
 
+    let ident = &sig.ident;
     quote! {
         #(#attrs)* #vis #sig {
-            ::balter::transaction::transaction_hook(async move {
+            ::balter::transaction::transaction_hook(::balter::core::generate_labels!(#ident), async move {
                 #(#stmts)*
             }).await
         }

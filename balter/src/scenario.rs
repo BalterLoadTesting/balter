@@ -285,6 +285,7 @@ where
     }
 }
 
+#[allow(unused)]
 #[cfg(feature = "rt")]
 async fn distribute_work(_config: &ScenarioConfig, _elapsed: Duration, _self_tps: f64) {
     /*
