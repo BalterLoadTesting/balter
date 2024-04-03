@@ -15,9 +15,9 @@ use std::{
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 
-mod tps_sampler;
+mod sampler;
 
-use tps_sampler::ConcurrentSampler;
+use sampler::ConcurrentSampler;
 
 /// Load test scenario structure
 ///

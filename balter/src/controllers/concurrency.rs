@@ -162,7 +162,7 @@ struct Measurement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use balter_core::TpsData;
+    use balter_core::SampleData;
     use std::num::NonZeroU32;
     use std::time::Duration;
 
@@ -173,7 +173,7 @@ mod tests {
             let success_count = tps;
             let elapsed = Duration::from_secs(1);
 
-            samples.push(TpsData {
+            samples.push(SampleData {
                 success_count,
                 error_count: 0,
                 elapsed,

@@ -1,7 +1,7 @@
 use crate::controllers::{CCOutcome, ConcurrencyController};
 use crate::transaction::{TransactionData, TRANSACTION_HOOK};
 use arc_swap::ArcSwap;
-use balter_core::{SampleSet, TpsData};
+use balter_core::{SampleData, SampleSet};
 use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use std::future::Future;
 use std::{
@@ -26,7 +26,7 @@ const SKIP_SIZE: usize = 25;
 // be good to remove this tricky area.
 pub(crate) struct ConcurrentSampler<T> {
     base_label: String,
-    tps_sampler: TpsSampler<T>,
+    tps_sampler: Sampler<T>,
     cc: ConcurrencyController,
     samples: SampleSet,
     needs_clear: bool,
@@ -41,7 +41,7 @@ where
     pub(crate) fn new(name: &str, scenario: T, goal_tps: NonZeroU32) -> Self {
         let new = Self {
             base_label: format!("balter_{name}"),
-            tps_sampler: TpsSampler::new(scenario, goal_tps),
+            tps_sampler: Sampler::new(scenario, goal_tps),
             cc: ConcurrencyController::new(goal_tps),
             samples: SampleSet::new(SAMPLE_WINDOW_SIZE).skip_first_n(SKIP_SIZE),
             needs_clear: false,
@@ -154,7 +154,7 @@ where
     }
 }
 
-pub(crate) struct TpsSampler<T> {
+pub(crate) struct Sampler<T> {
     scenario: T,
     concurrency: Arc<AtomicUsize>,
     limiter: Arc<ArcSwap<DefaultDirectRateLimiter>>,
@@ -168,7 +168,7 @@ pub(crate) struct TpsSampler<T> {
     error_count: Arc<AtomicU64>,
 }
 
-impl<T, F> TpsSampler<T>
+impl<T, F> Sampler<T>
 where
     T: Fn() -> F + Send + Sync + 'static + Clone,
     F: Future<Output = ()> + Send,
@@ -194,14 +194,14 @@ where
         new_self
     }
 
-    pub(crate) async fn sample_tps(&mut self) -> TpsData {
+    pub(crate) async fn sample_tps(&mut self) -> SampleData {
         self.interval.tick().await;
         let success_count = self.success_count.swap(0, Ordering::Relaxed);
         let error_count = self.error_count.swap(0, Ordering::Relaxed);
         let elapsed = self.last_tick.elapsed();
         self.last_tick = Instant::now();
 
-        let data = TpsData {
+        let data = SampleData {
             elapsed,
             success_count,
             error_count,
@@ -308,8 +308,7 @@ mod tests {
     #[ignore]
     #[ntest::timeout(300)]
     async fn test_simple_case() {
-        let mut tps_sampler =
-            TpsSampler::new(mock_trivial_scenario, NonZeroU32::new(1_000).unwrap());
+        let mut tps_sampler = Sampler::new(mock_trivial_scenario, NonZeroU32::new(1_000).unwrap());
         tps_sampler.set_concurrency(20);
 
         let _sample = tps_sampler.sample_tps().await;
@@ -325,7 +324,7 @@ mod tests {
     #[ignore]
     #[ntest::timeout(300)]
     async fn test_noisy_case() {
-        let mut tps_sampler = TpsSampler::new(mock_noisy_scenario, NonZeroU32::new(1_000).unwrap());
+        let mut tps_sampler = Sampler::new(mock_noisy_scenario, NonZeroU32::new(1_000).unwrap());
         tps_sampler.set_concurrency(20);
 
         let _sample = tps_sampler.sample_tps().await;

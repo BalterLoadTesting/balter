@@ -2,13 +2,13 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 #[derive(Debug, Copy, Clone)]
-pub struct TpsData {
+pub struct SampleData {
     pub success_count: u64,
     pub error_count: u64,
     pub elapsed: Duration,
 }
 
-impl TpsData {
+impl SampleData {
     #[allow(unused)]
     pub fn new() -> Self {
         Self {
@@ -33,7 +33,7 @@ impl TpsData {
 
 #[derive(Debug)]
 pub struct SampleSet {
-    samples: VecDeque<TpsData>,
+    samples: VecDeque<SampleData>,
     window_size: usize,
     skip_first_n: Option<usize>,
     skip_window: usize,
@@ -55,7 +55,7 @@ impl SampleSet {
         self
     }
 
-    pub fn push(&mut self, sample: TpsData) {
+    pub fn push(&mut self, sample: SampleData) {
         if self.skip_window > 0 {
             self.skip_window -= 1;
             return;
@@ -82,7 +82,7 @@ impl SampleSet {
     // non-optional return values here
     pub fn mean_err(&self) -> Option<f64> {
         if self.samples.len() == self.window_size {
-            let sum: f64 = self.samples.iter().map(TpsData::error_rate).sum();
+            let sum: f64 = self.samples.iter().map(SampleData::error_rate).sum();
             Some(sum / self.samples.len() as f64)
         } else {
             None
@@ -91,7 +91,7 @@ impl SampleSet {
 
     pub fn mean_tps(&self) -> Option<f64> {
         if self.samples.len() == self.window_size {
-            let sum: f64 = self.samples.iter().map(TpsData::tps).sum();
+            let sum: f64 = self.samples.iter().map(SampleData::tps).sum();
             Some(sum / self.samples.len() as f64)
         } else {
             None
