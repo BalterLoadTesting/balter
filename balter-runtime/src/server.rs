@@ -63,7 +63,7 @@ impl IntoResponse for HandlerError {
         use HandlerError::*;
         match self {
             Runtime(RuntimeError::NoScenario) => {
-                (StatusCode::NOT_FOUND, format!("Scenario not found"))
+                (StatusCode::NOT_FOUND, "Scenario not found".to_string())
             }
             Send(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,

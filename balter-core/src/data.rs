@@ -8,6 +8,12 @@ pub struct SampleData {
     pub elapsed: Duration,
 }
 
+impl Default for SampleData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SampleData {
     #[allow(unused)]
     pub fn new() -> Self {

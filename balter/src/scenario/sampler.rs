@@ -290,11 +290,21 @@ mod tests {
     use rand_distr::{Distribution, Normal};
 
     async fn mock_trivial_scenario() {
-        let _ = crate::transaction::transaction_hook::<_, (), ()>(async { Ok(()) }).await;
+        let labels = balter_core::TransactionLabels {
+            success: "",
+            error: "",
+            latency: "",
+        };
+        let _ = crate::transaction::transaction_hook::<_, (), ()>(labels, async { Ok(()) }).await;
     }
 
     async fn mock_noisy_scenario() {
-        let _ = crate::transaction::transaction_hook::<_, (), ()>(async {
+        let labels = balter_core::TransactionLabels {
+            success: "",
+            error: "",
+            latency: "",
+        };
+        let _ = crate::transaction::transaction_hook::<_, (), ()>(labels, async {
             let normal = Normal::new(100., 25.).unwrap();
             let v: f64 = normal.sample(&mut rand::thread_rng());
             tokio::time::sleep(Duration::from_micros(v.floor() as u64)).await;

@@ -7,6 +7,9 @@ prep:
     cargo test --release
     cargo semver-checks
 
+version EXECUTE:
+    cargo release version --exclude balter-tests --exclude mock-service --exclude examples minor {{EXECUTE}}
+
 publish:
     cd balter-macros && cargo publish
     cd balter-core && cargo publish
