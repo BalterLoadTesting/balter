@@ -29,7 +29,7 @@ impl CompositeController {
         }
 
         if let Some(error_rate) = config.error_rate {
-            controllers.push(Box::new(ErrorRateController::new(error_rate)));
+            controllers.push(Box::new(ErrorRateController::new(&config.name, error_rate)));
         }
 
         if let Some(latency) = config.latency {

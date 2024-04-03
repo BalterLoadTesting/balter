@@ -48,6 +48,7 @@ lazy_static! {
 pub async fn max(
     Path((max_tps, delay_ms, scenario_name)): Path<(u32, u64, String)>,
 ) -> Result<(), StatusCode> {
+    counter!("mock-server.tps").increment(1);
     TPS_MEASURE.fetch_add(1, Ordering::Relaxed);
     tokio::time::sleep(Duration::from_millis(delay_ms)).await;
 
@@ -83,6 +84,7 @@ lazy_static! {
 pub async fn limited(
     Path((max_tps, delay_ms, server_id)): Path<(u32, u64, String)>,
 ) -> Result<(), StatusCode> {
+    counter!("mock-server.tps").increment(1);
     TPS_MEASURE.fetch_add(1, Ordering::Relaxed);
     tokio::time::sleep(Duration::from_millis(delay_ms)).await;
 

@@ -17,7 +17,7 @@ mod tests {
 
         ONCE_LOCK.get_or_init(|| {
             FmtSubscriber::builder()
-                .with_env_filter("balter=debug")
+                .with_env_filter("balter=trace")
                 .init();
 
             PrometheusBuilder::new()
@@ -42,7 +42,7 @@ mod tests {
 
         let stats = scenario_1ms_delay()
             .tps(NonZeroU32::new(10_000).unwrap())
-            .duration(Duration::from_secs(30))
+            //.duration(Duration::from_secs(30))
             .await;
 
         assert_eq!(stats.tps.get(), 10_000);
@@ -55,7 +55,7 @@ mod tests {
 
         let stats = scenario_1ms_limited_7000()
             .tps(NonZeroU32::new(10_000).unwrap())
-            .duration(Duration::from_secs(60))
+            //.duration(Duration::from_secs(60))
             .await;
 
         assert!(dbg!(stats.tps.get()) <= 7_100);
@@ -66,9 +66,11 @@ mod tests {
     async fn single_instance_error_rate() {
         init().await;
 
+        tokio::time::sleep(Duration::from_secs(15)).await;
+
         let stats = scenario_1ms_max_2000()
             .saturate()
-            .duration(Duration::from_secs(60))
+            //.duration(Duration::from_secs(60))
             .await;
 
         assert!(dbg!(stats.tps.get()) <= 2_300);

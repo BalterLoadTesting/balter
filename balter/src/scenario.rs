@@ -258,9 +258,12 @@ where
 
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
     loop {
-        if let Some(samples) = sampler.get_samples().await {
+        if let (stable, Some(samples)) = sampler.get_samples().await {
             let new_goal_tps = controllers.limit(&samples);
-            sampler.set_goal_tps(new_goal_tps);
+
+            if new_goal_tps < sampler.goal_tps() || stable {
+                sampler.set_goal_tps(new_goal_tps);
+            }
         }
 
         if let Some(duration) = config.duration {

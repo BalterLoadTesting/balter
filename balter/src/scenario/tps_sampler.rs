@@ -15,11 +15,15 @@ use std::{
 use tokio::task::JoinHandle;
 use tokio::time::{interval, Interval};
 #[allow(unused)]
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
-const SAMPLE_WINDOW_SIZE: usize = 10;
-const SKIP_SIZE: usize = 3;
+const SAMPLE_WINDOW_SIZE: usize = 100;
+const SKIP_SIZE: usize = 25;
 
+// TODO: Currently there is some weird idiosyncrasies between the the tps_sampler and the
+// ConcurrencyController, namely the fact that they need to have data between them which is kept in
+// sync. This is definitely an area for bugs to sneak in, and so a rethink of the data flows would
+// be good to remove this tricky area.
 pub(crate) struct ConcurrentSampler<T> {
     base_label: String,
     tps_sampler: TpsSampler<T>,
@@ -51,13 +55,13 @@ where
         new
     }
 
-    pub(crate) async fn get_samples(&mut self) -> Option<&SampleSet> {
+    pub(crate) async fn get_samples(&mut self) -> (bool, Option<&SampleSet>) {
         // NOTE: We delay clearing our samples to allow for the various controllers to potentially
         // lower the goal_tps. For instance, if we haven't reached our GoalTPS but the error rate
         // is too high, we don't want to adjust the concurrency and clear the data collected -- we
         // want to reset the goal.
         if self.needs_clear {
-            info!("Clearing samples");
+            trace!("Clearing samples");
             self.samples.clear();
             self.needs_clear = false;
         }
@@ -65,7 +69,7 @@ where
         self.samples.push(self.tps_sampler.sample_tps().await);
 
         if self.samples.full() {
-            match self.cc.analyze(&self.samples) {
+            let stable = match self.cc.analyze(&self.samples) {
                 CCOutcome::Stable => {
                     if cfg!(feature = "metrics") {
                         // TODO: Given these metric recordings aren't on the hot-path it is likely
@@ -73,17 +77,22 @@ where
                         // that would be preferable.
                         metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(1);
                     }
+                    true
                 }
                 CCOutcome::TpsLimited(max_tps, concurrency) => {
                     // TODO: There is currently no way to get _out_ of being tps_limited. This may
                     // or may not be a problem, but it would be good to evaluate other options.
-                    self.tps_limited = true;
+                    if !self.tps_limited {
+                        self.tps_limited = true;
+                        warn!("Unable to achieve TPS on current server.");
+                    }
                     self.set_concurrency(concurrency);
                     self.set_goal_tps_unchecked(max_tps);
 
                     if cfg!(feature = "metrics") {
                         metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(2);
                     }
+                    false
                 }
                 CCOutcome::AlterConcurrency(concurrency) => {
                     self.set_concurrency(concurrency);
@@ -91,18 +100,23 @@ where
                     if cfg!(feature = "metrics") {
                         metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(0);
                     }
+                    false
                 }
-            }
+            };
 
-            Some(&self.samples)
+            (stable, Some(&self.samples))
         } else {
-            None
+            (false, None)
         }
+    }
+
+    pub fn goal_tps(&self) -> NonZeroU32 {
+        self.tps_sampler.tps_limit
     }
 
     pub fn set_goal_tps(&mut self, goal_tps: NonZeroU32) {
         if self.tps_limited && goal_tps > self.tps_sampler.tps_limit {
-            debug!("Unable to set TPS; TPS is limited");
+            trace!("Unable to set TPS; TPS is limited");
         } else {
             self.set_goal_tps_unchecked(goal_tps);
         }
@@ -114,7 +128,7 @@ where
 
     fn set_concurrency(&mut self, concurrency: usize) {
         self.needs_clear = true;
-        info!("Setting concurrency to: {concurrency}");
+        trace!("Setting concurrency to: {concurrency}");
         self.tps_sampler.set_concurrency(concurrency);
 
         if cfg!(feature = "metrics") {

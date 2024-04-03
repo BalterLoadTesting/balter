@@ -1,6 +1,6 @@
 use balter_core::SampleSet;
-
 use std::num::NonZeroU32;
+#[allow(unused)]
 use tracing::{debug, error, trace};
 
 // TODO: Does it make more sense to have this as CPU count?
@@ -27,7 +27,7 @@ impl ConcurrencyController {
         let concurrency = if goal_tps > self.goal_tps {
             self.concurrency
         } else {
-            // NOTE: There is likely a smarter default here
+            // TODO: There is likely a smarter default here
             STARTING_CONCURRENCY_COUNT
         };
 
@@ -55,9 +55,11 @@ impl ConcurrencyController {
 
         let goal_tps: f64 = Into::<u32>::into(self.goal_tps).into();
 
-        debug!(
+        trace!(
             "Goal TPS: {}, Measured TPS: {} at {} concurrency",
-            goal_tps, measurement.tps, self.concurrency
+            goal_tps,
+            measurement.tps,
+            self.concurrency
         );
 
         let error = (goal_tps - measurement.tps) / goal_tps;

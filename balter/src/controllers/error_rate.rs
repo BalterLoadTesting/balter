@@ -8,21 +8,23 @@ const ERROR_RATE_TOLERANCE: f64 = 0.03;
 const DEFAULT_SMALL_STEP_SIZE: f64 = 0.1;
 
 pub(crate) struct ErrorRateController {
+    base_label: String,
     goal_tps: NonZeroU32,
     error_rate: f64,
     state: State,
 }
 
 impl ErrorRateController {
-    pub fn new(error_rate: f64) -> Self {
+    pub fn new(name: &str, error_rate: f64) -> Self {
         Self {
+            base_label: format!("balter_{name}"),
             goal_tps: BASELINE_TPS,
             error_rate,
             state: State::BigStep,
         }
     }
 
-    fn check_in_bounds(&self, sample_error_rate: f64) -> Bounds {
+    fn check_bounds(&self, sample_error_rate: f64) -> Bounds {
         let bounds = (
             self.error_rate - ERROR_RATE_TOLERANCE,
             self.error_rate + ERROR_RATE_TOLERANCE,
@@ -48,61 +50,81 @@ impl Controller for ErrorRateController {
         // TODO: Remove panic; this can be a type-safe check
         let sample_error_rate = samples.mean_err().expect("Invalid number of samples");
 
-        match self.check_in_bounds(sample_error_rate) {
+        (self.goal_tps, self.state) = match self.check_bounds(sample_error_rate) {
             Bounds::Under => match self.state {
-                State::BigStep => {
-                    self.goal_tps = NonZeroU32::new(self.goal_tps.get() * 2).unwrap();
-                    self.goal_tps
+                s @ State::BigStep => {
+                    trace!("Under bounds w/ BigStep");
+                    (NonZeroU32::new(self.goal_tps.get() * 2).unwrap(), s)
                 }
-                State::SmallStep(step_ratio) => {
+                s @ State::SmallStep(step_ratio) => {
+                    trace!("Under bounds w/ SmallStep.");
                     // TODO: Better handling of conversions
                     let step = (self.goal_tps.get() as f64 * step_ratio).max(1.);
-                    self.goal_tps = NonZeroU32::new(self.goal_tps.get() + step as u32).unwrap();
-                    self.goal_tps
+                    (
+                        NonZeroU32::new(self.goal_tps.get() + step as u32).unwrap(),
+                        s,
+                    )
                 }
                 State::Stable => {
-                    self.state = State::SmallStep(DEFAULT_SMALL_STEP_SIZE);
-                    self.goal_tps
+                    trace!("Under bounds w/ Stable.");
+                    (self.goal_tps, State::SmallStep(DEFAULT_SMALL_STEP_SIZE))
                 }
             },
             Bounds::At => {
                 match self.state {
                     State::BigStep | State::SmallStep(_) => {
-                        self.state = State::Stable;
+                        trace!("At bounds w/ BigStep|SmallStep.");
                         // TODO: Remove unwraps
                         let samples_tps = samples.mean_tps().unwrap();
-                        self.goal_tps = convert_to_nonzerou32(samples_tps).unwrap();
-                        self.goal_tps
+                        (convert_to_nonzerou32(samples_tps).unwrap(), State::Stable)
                     }
-                    State::Stable => self.goal_tps,
+                    s @ State::Stable => {
+                        trace!("At bounds w/ Stable.");
+                        (self.goal_tps, s)
+                    }
                 }
             }
             Bounds::Over => {
                 match self.state {
                     State::BigStep => {
-                        self.state = State::SmallStep(DEFAULT_SMALL_STEP_SIZE);
+                        trace!("Over bounds w/ BigStep.");
                         // TODO: Remove unwrap
-                        self.goal_tps = NonZeroU32::new(self.goal_tps.get() / 2).unwrap();
-                        self.goal_tps
+                        (
+                            NonZeroU32::new(self.goal_tps.get() / 2).unwrap(),
+                            State::SmallStep(DEFAULT_SMALL_STEP_SIZE),
+                        )
                     }
                     State::SmallStep(step_ratio) => {
-                        self.state = State::SmallStep(step_ratio / 2.);
+                        trace!("Over bounds w/ SmallStep.");
 
                         let step = (self.goal_tps.get() as f64 * step_ratio).max(1.);
-                        self.goal_tps = NonZeroU32::new(self.goal_tps.get() - step as u32).unwrap();
-
-                        self.goal_tps
+                        (
+                            NonZeroU32::new(self.goal_tps.get() - step as u32).unwrap(),
+                            State::SmallStep(step_ratio / 2.),
+                        )
                     }
                     State::Stable => {
-                        self.state = State::SmallStep(DEFAULT_SMALL_STEP_SIZE);
-                        self.goal_tps
+                        trace!("Over bounds w/ Stable.");
+                        (self.goal_tps, State::SmallStep(DEFAULT_SMALL_STEP_SIZE))
                     }
                 }
             }
+        };
+
+        if cfg!(feature = "metrics") {
+            metrics::gauge!(format!("{}_erc_goal_tps", &self.base_label)).set(self.goal_tps.get());
+            metrics::gauge!(format!("{}_erc_state", &self.base_label)).set(match self.state {
+                State::BigStep => 2,
+                State::SmallStep(_) => 1,
+                State::Stable => 0,
+            });
         }
+
+        self.goal_tps
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 enum State {
     BigStep,
     SmallStep(f64),
