@@ -67,7 +67,7 @@ pub trait ConfigurableScenario<T: Send>: Future<Output = T> + Sized + Send {
     fn overload(self) -> Self;
     fn error_rate(self, error_rate: f64) -> Self;
     fn tps(self, tps: NonZeroU32) -> Self;
-    //fn direct(self, tps_limit: u32, concurrency: usize) -> Self;
+    fn latency(self, latency: Duration, quantile: f64) -> Self;
     fn duration(self, duration: Duration) -> Self;
 }
 
@@ -77,8 +77,6 @@ where
     F: Future<Output = ()> + Send,
 {
     /// Run the scenario increasing TPS until an error rate of 3% is reached.
-    ///
-    /// NOTE: Must supply a `.duration()` as well
     ///
     /// # Example
     /// ```no_run
@@ -104,8 +102,6 @@ where
 
     /// Run the scenario increasing TPS until an error rate of 80% is reached.
     ///
-    /// NOTE: Must supply a `.duration()` as well
-    ///
     /// # Example
     /// ```no_run
     /// use balter::prelude::*;
@@ -129,8 +125,6 @@ where
     }
 
     /// Run the scenario increasing TPS until a custom error rate is reached.
-    ///
-    /// NOTE: Must supply a `.duration()` as well
     ///
     /// # Example
     /// ```no_run
@@ -156,8 +150,6 @@ where
 
     /// Run the scenario at the specified TPS.
     ///
-    /// NOTE: Must supply a `.duration()` as well
-    ///
     /// # Example
     /// ```no_run
     /// use balter::prelude::*;
@@ -181,15 +173,35 @@ where
         self
     }
 
-    /*
-    /// Run the scenario with direct control over TPS and concurrency.
-    /// No automatic controls will limit or change any values. This is intended
-    /// for development testing or advanced ussage.
-    fn direct(mut self, tps_limit: u32, concurrency: usize) -> Self {
-        self.config.kind = ScenarioKind::Direct(tps_limit, concurrency);
+    /// Run the scenario up to the specified latency.
+    ///
+    /// Quantile must be between 0 and 1.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use balter::prelude::*;
+    /// use std::time::Duration;
+    /// use std::num::NonZeroU32;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     my_scenario()
+    ///         .latency(Duration::from_millis(200), 0.95)
+    ///         .await;
+    /// }
+    ///
+    /// #[scenario]
+    /// async fn my_scenario() {
+    /// }
+    /// ```
+    fn latency(mut self, latency: Duration, quantile: f64) -> Self {
+        if !(0. ..=1.).contains(&quantile) {
+            panic!("Specified quantile must be between 0 and 1. Value provided was {quantile}.");
+        }
+
+        self.config.latency = Some((latency, quantile));
         self
     }
-    */
 
     /// Run the scenario for the given duration.
     ///

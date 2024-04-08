@@ -78,6 +78,22 @@ mod tests {
         assert!(stats.concurrency >= 2);
     }
 
+    #[tokio::test]
+    async fn single_instance_latency() {
+        init().await;
+
+        //tokio::time::sleep(Duration::from_secs(15)).await;
+
+        let stats = scenario_1ms_delay()
+            .latency(Duration::from_millis(2), 0.99)
+            //.duration(Duration::from_secs(60))
+            .await;
+
+        assert!(dbg!(stats.tps.get()) <= 2_300);
+        assert!(dbg!(stats.tps.get()) >= 1_900);
+        assert!(stats.concurrency >= 2);
+    }
+
     /* Scenario Helpers */
 
     static CLIENT: OnceLock<Client> = OnceLock::new();

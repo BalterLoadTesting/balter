@@ -14,9 +14,10 @@ publish = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cfg_eval = { version = "0.1.2", optional = true }
+pdatastructs = "0.7.0"
 serde = { version = "1.0.193", features = ["derive"], optional = true }
 serde_with = { version = "3.4.0", optional = true}
-cfg_eval = { version = "0.1.2", optional = true }
 
 [dev-dependencies]
 rand = { version = "0.8.5", features = ["small_rng"] }

@@ -3,6 +3,7 @@ use crate::transaction::{TransactionData, TRANSACTION_HOOK};
 use arc_swap::ArcSwap;
 use balter_core::{SampleData, SampleSet};
 use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
+use metrics_util::AtomicBucket;
 use std::future::Future;
 use std::{
     num::NonZeroU32,
@@ -66,7 +67,7 @@ where
             self.needs_clear = false;
         }
 
-        self.samples.push(self.tps_sampler.sample_tps().await);
+        self.tps_sampler.sample(&mut self.samples).await;
 
         if self.samples.full() {
             let stable = match self.cc.analyze(&self.samples) {
@@ -166,6 +167,7 @@ pub(crate) struct Sampler<T> {
 
     success_count: Arc<AtomicU64>,
     error_count: Arc<AtomicU64>,
+    latency: Arc<AtomicBucket<Duration>>,
 }
 
 impl<T, F> Sampler<T>
@@ -189,15 +191,26 @@ where
 
             success_count: Arc::new(AtomicU64::new(0)),
             error_count: Arc::new(AtomicU64::new(0)),
+            latency: Arc::new(AtomicBucket::new()),
         };
         new_self.populate_jobs();
         new_self
     }
 
-    pub(crate) async fn sample_tps(&mut self) -> SampleData {
+    // TODO: This function is a bit awkward in taking SampleSet as an argument. Perhaps Sampler
+    // should own the SampleSet data-structure.
+    pub(crate) async fn sample(&mut self, samples: &mut SampleSet) {
         self.interval.tick().await;
+
+        self.latency.clear_with(|durations| {
+            for duration in durations {
+                samples.push_latency(*duration);
+            }
+        });
+
         let success_count = self.success_count.swap(0, Ordering::Relaxed);
         let error_count = self.error_count.swap(0, Ordering::Relaxed);
+
         let elapsed = self.last_tick.elapsed();
         self.last_tick = Instant::now();
 
@@ -215,7 +228,7 @@ where
             self.interval.tick().await;
         }
 
-        data
+        samples.push(data);
     }
 
     /// NOTE: Panics when concurrent_count=0
@@ -256,10 +269,10 @@ where
                 let concurrent_count = self.concurrency.clone();
                 let id = self.tasks.len();
                 let transaction_data = TransactionData {
-                    // TODO: Use ArcSwap here
                     limiter: self.limiter.clone(),
                     success: self.success_count.clone(),
                     error: self.error_count.clone(),
+                    latency: self.latency.clone(),
                 };
 
                 trace!("Spawning a new task with id {id}.");
@@ -321,11 +334,12 @@ mod tests {
         let mut tps_sampler = Sampler::new(mock_trivial_scenario, NonZeroU32::new(1_000).unwrap());
         tps_sampler.set_concurrency(20);
 
-        let _sample = tps_sampler.sample_tps().await;
+        let mut samples = SampleSet::new(1);
+        tps_sampler.sample(&mut samples).await;
         for _ in 0..10 {
-            let sample = tps_sampler.sample_tps().await;
-            info!("tps: {}", sample.tps());
-            assert!((1_000. - sample.tps()).abs() < 150.);
+            tps_sampler.sample(&mut samples).await;
+            info!("tps: {}", samples.mean_tps().unwrap());
+            assert!((1_000. - samples.mean_tps().unwrap()).abs() < 150.);
         }
     }
 
@@ -337,11 +351,12 @@ mod tests {
         let mut tps_sampler = Sampler::new(mock_noisy_scenario, NonZeroU32::new(1_000).unwrap());
         tps_sampler.set_concurrency(20);
 
-        let _sample = tps_sampler.sample_tps().await;
+        let mut samples = SampleSet::new(1);
+        tps_sampler.sample(&mut samples).await;
         for _ in 0..10 {
-            let sample = tps_sampler.sample_tps().await;
-            info!("tps: {}", sample.tps());
-            assert!((1_000. - sample.tps()).abs() < 150.);
+            tps_sampler.sample(&mut samples).await;
+            info!("tps: {}", samples.mean_tps().unwrap());
+            assert!((1_000. - samples.mean_tps().unwrap()).abs() < 150.);
         }
     }
 }

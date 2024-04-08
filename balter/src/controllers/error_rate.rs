@@ -5,7 +5,7 @@ use std::num::NonZeroU32;
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 
 const ERROR_RATE_TOLERANCE: f64 = 0.03;
-const DEFAULT_SMALL_STEP_SIZE: f64 = 0.1;
+const DEFAULT_SMALL_STEP_SIZE: f64 = 0.5;
 
 pub(crate) struct ErrorRateController {
     base_label: String,

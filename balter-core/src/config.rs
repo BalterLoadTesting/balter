@@ -18,7 +18,7 @@ pub struct ScenarioConfig {
     pub duration: Option<Duration>,
     pub max_tps: Option<NonZeroU32>,
     pub error_rate: Option<f64>,
-    pub latency: Option<Duration>,
+    pub latency: Option<(Duration, f64)>,
 }
 
 impl ScenarioConfig {

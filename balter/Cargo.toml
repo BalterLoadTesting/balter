@@ -21,6 +21,8 @@ arc-swap = "1.6.0"
 governor = "0.6.0"
 humantime = "2.1.0"
 metrics = { version = "0.22.3", optional = true }
+metrics-util = "0.16.3"
+pdatastructs = "0.7.0"
 pin-project = "1.1.2"
 thiserror = "1.0.56"
 tokio = { version = "1.29.1", features = ["rt", "time"] }

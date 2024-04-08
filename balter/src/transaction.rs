@@ -1,7 +1,8 @@
 use arc_swap::ArcSwap;
 use balter_core::TransactionLabels;
 use governor::DefaultDirectRateLimiter;
-use std::time::Instant;
+use metrics_util::AtomicBucket;
+use std::time::{Duration, Instant};
 use std::{
     future::Future,
     sync::{
@@ -26,6 +27,10 @@ where
         let res = func.await;
         let elapsed = start.elapsed();
 
+        // TODO: Unfortunately we're duplicating all data collection here, which isn't ideal.
+        // It makes more sense to move the metric logging out of the individual
+        // transaction_hooks, and to log it in the sampler.
+        hook.latency.push(elapsed);
         if cfg!(feature = "metrics") {
             // TODO: What are the implications of calling this every time?
             metrics::describe_histogram!(labels.latency, metrics::Unit::Nanoseconds, "");
@@ -57,6 +62,7 @@ pub(crate) struct TransactionData {
     pub limiter: Arc<ArcSwap<DefaultDirectRateLimiter>>,
     pub success: Arc<AtomicU64>,
     pub error: Arc<AtomicU64>,
+    pub latency: Arc<AtomicBucket<Duration>>,
 }
 
 tokio::task_local! {

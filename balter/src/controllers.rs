@@ -32,8 +32,8 @@ impl CompositeController {
             controllers.push(Box::new(ErrorRateController::new(&config.name, error_rate)));
         }
 
-        if let Some(latency) = config.latency {
-            controllers.push(Box::new(LatencyController::new(latency)));
+        if let Some((latency, quantile)) = config.latency {
+            controllers.push(Box::new(LatencyController::new(latency, quantile)));
         }
 
         Self { controllers }
