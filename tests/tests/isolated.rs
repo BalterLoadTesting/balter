@@ -85,7 +85,7 @@ mod tests {
         //tokio::time::sleep(Duration::from_secs(15)).await;
 
         let stats = scenario_1ms_delay()
-            .latency(Duration::from_millis(2), 0.99)
+            .latency(Duration::from_millis(10), 0.99)
             //.duration(Duration::from_secs(60))
             .await;
 

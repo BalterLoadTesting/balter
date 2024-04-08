@@ -173,9 +173,7 @@ where
         self
     }
 
-    /// Run the scenario up to the specified latency.
-    ///
-    /// Quantile must be between 0 and 1.
+    /// Run the scenario up to the specified latency, given a quantile.
     ///
     /// # Example
     /// ```no_run
@@ -186,6 +184,7 @@ where
     /// #[tokio::main]
     /// async fn main() {
     ///     my_scenario()
+    ///         // Scale scenario until p95 latency is 200ms
     ///         .latency(Duration::from_millis(200), 0.95)
     ///         .await;
     /// }
@@ -194,6 +193,10 @@ where
     /// async fn my_scenario() {
     /// }
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the quantile is not between 0 and 1.
     fn latency(mut self, latency: Duration, quantile: f64) -> Self {
         if !(0. ..=1.).contains(&quantile) {
             panic!("Specified quantile must be between 0 and 1. Value provided was {quantile}.");

@@ -33,7 +33,11 @@ impl CompositeController {
         }
 
         if let Some((latency, quantile)) = config.latency {
-            controllers.push(Box::new(LatencyController::new(latency, quantile)));
+            controllers.push(Box::new(LatencyController::new(
+                &config.name,
+                latency,
+                quantile,
+            )));
         }
 
         Self { controllers }

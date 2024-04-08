@@ -33,8 +33,8 @@ where
         hook.latency.push(elapsed);
         if cfg!(feature = "metrics") {
             // TODO: What are the implications of calling this every time?
-            metrics::describe_histogram!(labels.latency, metrics::Unit::Nanoseconds, "");
-            metrics::histogram!(labels.latency).record(elapsed.as_nanos() as f64);
+            metrics::describe_histogram!(labels.latency, metrics::Unit::Seconds, "");
+            metrics::histogram!(labels.latency).record(elapsed.as_secs_f64());
         }
 
         if res.is_ok() {
