@@ -2,7 +2,7 @@ use crate::controllers::Controller;
 use balter_core::{SampleSet, BASELINE_TPS};
 use std::num::NonZeroU32;
 use std::time::Duration;
-use tracing::error;
+use tracing::{debug, error};
 
 const KP: f64 = 1.2;
 
@@ -38,7 +38,7 @@ impl Controller for LatencyController {
         BASELINE_TPS
     }
 
-    fn limit(&mut self, samples: &SampleSet) -> NonZeroU32 {
+    fn limit(&mut self, samples: &SampleSet, stable: bool) -> NonZeroU32 {
         let measured_latency = samples.latency(self.quantile);
 
         let normalized_err = 1. - measured_latency.as_secs_f64() / self.latency.as_secs_f64();
@@ -46,8 +46,12 @@ impl Controller for LatencyController {
         let new_goal = self.goal_tps.get() as f64 * (1. + KP * normalized_err);
 
         if let Some(new_goal) = NonZeroU32::new(new_goal as u32) {
-            self.goal_tps = new_goal;
-            self.goal_tps_metric();
+            if new_goal < self.goal_tps || stable {
+                self.goal_tps = new_goal;
+                self.goal_tps_metric();
+            } else {
+                debug!("TPS not stabalized; holding off on increasing TPS");
+            }
         } else {
             error!("Error in the LatencyController. Calculated a goal_tps of {new_goal} which is invalid.");
         }

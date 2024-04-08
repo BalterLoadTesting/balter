@@ -46,11 +46,11 @@ impl Controller for ErrorRateController {
         BASELINE_TPS
     }
 
-    fn limit(&mut self, samples: &SampleSet) -> NonZeroU32 {
+    fn limit(&mut self, samples: &SampleSet, stable: bool) -> NonZeroU32 {
         // TODO: Remove panic; this can be a type-safe check
         let sample_error_rate = samples.mean_err().expect("Invalid number of samples");
 
-        (self.goal_tps, self.state) = match self.check_bounds(sample_error_rate) {
+        let (new_goal_tps, new_state) = match self.check_bounds(sample_error_rate) {
             Bounds::Under => match self.state {
                 s @ State::BigStep => {
                     trace!("Under bounds w/ BigStep");
@@ -110,6 +110,13 @@ impl Controller for ErrorRateController {
                 }
             }
         };
+
+        if new_goal_tps < self.goal_tps || stable {
+            self.goal_tps = new_goal_tps;
+            self.state = new_state;
+        } else {
+            debug!("TPS not stabalized; holding off on increasing Goal TPS");
+        }
 
         if cfg!(feature = "metrics") {
             metrics::gauge!(format!("{}_erc_goal_tps", &self.base_label)).set(self.goal_tps.get());

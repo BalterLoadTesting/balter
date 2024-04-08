@@ -13,7 +13,7 @@ use std::num::NonZeroU32;
 
 pub(crate) trait Controller: Send {
     fn initial_tps(&self) -> NonZeroU32;
-    fn limit(&mut self, samples: &SampleSet) -> NonZeroU32;
+    fn limit(&mut self, samples: &SampleSet, stable: bool) -> NonZeroU32;
 }
 
 pub(crate) struct CompositeController {
@@ -53,10 +53,10 @@ impl Controller for CompositeController {
             .expect("No controllers present.")
     }
 
-    fn limit(&mut self, samples: &SampleSet) -> NonZeroU32 {
+    fn limit(&mut self, samples: &SampleSet, stable: bool) -> NonZeroU32 {
         self.controllers
             .iter_mut()
-            .map(|c| c.limit(samples))
+            .map(|c| c.limit(samples, stable))
             .min()
             .expect("No controllers present.")
     }

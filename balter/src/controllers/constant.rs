@@ -17,7 +17,7 @@ impl Controller for ConstantController {
         self.goal_tps
     }
 
-    fn limit(&mut self, _samples: &SampleSet) -> NonZeroU32 {
+    fn limit(&mut self, _samples: &SampleSet, _stable: bool) -> NonZeroU32 {
         self.goal_tps
     }
 }

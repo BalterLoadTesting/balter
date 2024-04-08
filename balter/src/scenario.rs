@@ -274,7 +274,7 @@ where
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
     loop {
         if let (stable, Some(samples)) = sampler.get_samples().await {
-            let new_goal_tps = controllers.limit(samples);
+            let new_goal_tps = controllers.limit(samples, stable);
 
             if new_goal_tps < sampler.goal_tps() || stable {
                 sampler.set_goal_tps(new_goal_tps);
