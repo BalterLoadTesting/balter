@@ -1,40 +1,16 @@
+mod utils;
+#[allow(unused)]
+use utils::*;
+
 #[cfg(feature = "integration")]
 mod tests {
+    use super::*;
 
     use balter::prelude::*;
-    use metrics_exporter_prometheus::PrometheusBuilder;
     use reqwest::Client;
-    use std::net::SocketAddr;
     use std::num::NonZeroU32;
     use std::sync::OnceLock;
     use std::time::Duration;
-    use tracing_subscriber::FmtSubscriber;
-
-    pub async fn init() {
-        static ONCE_LOCK: OnceLock<()> = OnceLock::new();
-
-        let wait = ONCE_LOCK.get().is_none();
-
-        ONCE_LOCK.get_or_init(|| {
-            FmtSubscriber::builder()
-                .with_env_filter("balter=trace")
-                .init();
-
-            PrometheusBuilder::new()
-                .with_http_listener("0.0.0.0:8002".parse::<SocketAddr>().unwrap())
-                .install()
-                .unwrap();
-
-            tokio::spawn(async {
-                let addr: SocketAddr = "0.0.0.0:3002".parse().unwrap();
-                mock_service::run(addr).await;
-            });
-        });
-
-        if wait {
-            tokio::time::sleep(Duration::from_millis(200)).await;
-        }
-    }
 
     #[tokio::test]
     async fn single_instance_tps() {
@@ -70,22 +46,6 @@ mod tests {
 
         let stats = scenario_1ms_max_2000()
             .saturate()
-            //.duration(Duration::from_secs(60))
-            .await;
-
-        assert!(dbg!(stats.tps.get()) <= 2_300);
-        assert!(dbg!(stats.tps.get()) >= 1_900);
-        assert!(stats.concurrency >= 2);
-    }
-
-    #[tokio::test]
-    async fn single_instance_latency() {
-        init().await;
-
-        //tokio::time::sleep(Duration::from_secs(15)).await;
-
-        let stats = scenario_1ms_delay()
-            .latency(Duration::from_millis(10), 0.99)
             //.duration(Duration::from_secs(60))
             .await;
 

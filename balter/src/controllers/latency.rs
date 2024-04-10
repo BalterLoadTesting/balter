@@ -2,9 +2,10 @@ use crate::controllers::Controller;
 use balter_core::{SampleSet, BASELINE_TPS};
 use std::num::NonZeroU32;
 use std::time::Duration;
-use tracing::{debug, error};
+#[allow(unused)]
+use tracing::{debug, error, trace};
 
-const KP: f64 = 1.2;
+const KP: f64 = 0.9;
 
 #[allow(unused)]
 pub(crate) struct LatencyController {
@@ -41,9 +42,14 @@ impl Controller for LatencyController {
     fn limit(&mut self, samples: &SampleSet, stable: bool) -> NonZeroU32 {
         let measured_latency = samples.latency(self.quantile);
 
+        trace!("LATENCY: Measured {measured_latency:?}");
+        trace!("LATENCY: Expected {:?}", self.latency);
+
         let normalized_err = 1. - measured_latency.as_secs_f64() / self.latency.as_secs_f64();
+        trace!("LATENCY: Error {normalized_err:?}");
 
         let new_goal = self.goal_tps.get() as f64 * (1. + KP * normalized_err);
+        trace!("LATENCY: New Goal {new_goal:?}");
 
         if let Some(new_goal) = NonZeroU32::new(new_goal as u32) {
             if new_goal < self.goal_tps || stable {

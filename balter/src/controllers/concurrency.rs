@@ -27,8 +27,11 @@ impl ConcurrencyController {
         let concurrency = if goal_tps > self.goal_tps {
             self.concurrency
         } else {
-            // TODO: There is likely a smarter default here
-            STARTING_CONCURRENCY_COUNT
+            // TODO: Better numerical conversions
+            let ratio = goal_tps.get() as f64 / self.goal_tps.get() as f64;
+            let new_concurrency =
+                (ratio * self.concurrency as f64).min(STARTING_CONCURRENCY_COUNT as f64);
+            new_concurrency as usize
         };
 
         self.set_goal_tps_with_concurrency(goal_tps, concurrency);
