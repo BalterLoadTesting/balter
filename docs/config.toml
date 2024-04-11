@@ -18,7 +18,9 @@ highlight_code = true
 juice_logo_name = "Balter"
 juice_logo_path = "balter.svg"
 juice_extra_menu = [
-    { title = "Github", link = "https://github.com/BalterLoadTesting/balter"}
+    { title = "Github", link = "https://github.com/BalterLoadTesting/balter"},
+    { title = "Crates.io", link = "https://crates.io/crates/balter"},
+    { title = "Docs", link = "https://docs.rs/balter/0.4.0/balter/"}
 ]
 juice_exclude_menu = [
     "exclude_from_nav"

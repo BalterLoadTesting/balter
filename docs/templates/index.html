@@ -1,9 +1,14 @@
 {% extends "juice/templates/index.html" %}
+{% set external_content_page = get_page(path="external/frontpage_code.md") %}
+{% include "external/frontpage_code.md" %}
+
 {% block hero %}
 <script async defer src="https://buttons.github.io/buttons.js"></script>
+
+<div class="hero-wrapper">
 <section class="text-center">
     <h1 class="heading-text" style="font-size: 50px">
-        Balter Load Testing
+        Balter
     </h1>
     <h3 class="title-text">
         The composable distributed load testing framework.
@@ -15,7 +20,40 @@
             data-show-count="true" aria-label="Fork BalterLoadTesting/balter on GitHub">Fork</a>
     </div>
 </section>
-<img class="hero-image" style="width: 50%" src="{{ get_url(path="balter.svg") }}">
+<div class="content demo-code">
+  {{ "```rust
+use balter::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    tokio::join! {
+        async {
+            // First, set up a background load which either hits
+            // 10K TPS, has a p95 latency of 200ms or has an
+            // error rate of 5%
+            set_background_load()
+                .tps(10_000)
+                .latency(Duration::from_millis(200), 0.95)
+                .error_rate(0.05)
+                .await;
+        },
+        async {
+            // After 300s of waiting, test our scaling ability
+            // by running a scenario which achieves either
+            // 100K TPS or a p90 latency of 1,000ms
+            sleep(Duration::from_secs(300)).await;
+
+            test_scaling_functionality()
+                .tps(100_000)
+                .latency(Duration::from_millis(1_000), 0.90)
+                .duration(Duration::from_secs(3600))
+                .await;
+        },
+    }
+}
+  ```" | markdown | safe }}
+</div>
+</div>
 
 <div class="explore-more text"
     onclick="document.getElementById('features').scrollIntoView({behavior: 'smooth'})">
@@ -34,6 +72,23 @@
         .hero-image {
             display: none
         }
+
+        .demo-code {
+            display: none
+        }
+    }
+
+    .hero-wrapper {
+      display: flex;
+      flex-wrap: wrap;
     }
 </style>
 {% endblock hero %}
+
+{% block footer %}
+<footer>
+    <small class="subtext">
+        <a href="https://balterloadtesting.com">BalterLoadTesting.com</a> © 2024
+    </small>
+</footer>
+{% endblock footer %}
