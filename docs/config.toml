@@ -15,8 +15,8 @@ theme = "juice"
 highlight_code = true
 
 [extra]
-juice_logo_name = "Juice"
-juice_logo_path = "juice.svg"
+juice_logo_name = "Balter"
+juice_logo_path = "balter.svg"
 juice_extra_menu = [
     { title = "Github", link = "https://github.com/BalterLoadTesting/balter"}
 ]
