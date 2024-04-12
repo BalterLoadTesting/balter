@@ -1,0 +1,94 @@
+{% import "_macros.html" as macros %}
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}{{ config.title }}{% endblock title %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    {% block favicon %}
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    {% endblock favicon %}
+    {% include "_variables.html" %}
+    {% block fonts %}
+    <link href="https://fonts.googleapis.com/css?family=Alfa+Slab+One&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Fira+Sans:400,500,600&display=swap" rel="stylesheet">
+    {% endblock fonts %}
+    <link rel="stylesheet" href="/normalize.css">
+    <link rel="stylesheet" href="{{ get_url(path="juice.css") }}">
+    {% block head %}
+    {% endblock head %}
+</head>
+
+<body>
+    {% block header %}
+
+    <header class="box-shadow">
+      {{ macros::render_header() }}
+    </header>
+
+    {% endblock header %}
+
+    <main>
+        {% block toc %}
+        {% if section.toc %}
+        {% set toc = section.toc %}
+        {% elif page.toc %}
+        {% set toc = page.toc %}
+        {% endif %}
+        {% if toc %}
+        <div class="toc">
+        </div>
+        {% endif %}
+        {% endblock toc %}
+
+        <div class="content text">
+            {% block content %}
+            <div id="features" class="heading-text">Blog</div>
+            {{ section.content | safe }}
+
+            {% for post in section.pages %}
+            <h1 style="border: None"><span style="padding-right: 1em">{{post.date}}</span> <a href="{{ post.permalink }}">{{ post.title }}</a></h1>
+            {% endfor %}
+
+            {% endblock content %}
+        </div>
+
+        {% block sidebar %}
+        {% endblock sidebar %}
+    </main>
+
+    {% block footer %}
+    <footer>
+        <small class="subtext">
+            <a href="https://huhu.io">Huhu.io</a> © 2021
+        </small>
+    </footer>
+    {% endblock footer %}
+</body>
+<script>
+    const scrollHandler = entries => {
+        // Find the first entry which intersecting and ratio > 0.9 to highlight.
+        let entry = entries.find(entry => {
+            return entry.isIntersecting && entry.intersectionRatio > 0.9;
+        });
+        if (!entry) return;
+
+        document.querySelectorAll(".toc a").forEach((item) => {
+            item.classList.remove("active");
+        });
+
+        // let url = new URL(`#${entry.target.id}`);
+        let link = document.querySelector(`.toc a[href$="${decodeURIComponent(`#${entry.target.id}`)}"]`)
+        if (link) {
+            link.classList.add("active");
+            link.scrollIntoView({ behavior: "auto", block: "nearest" });
+        }
+    };
+    // Set -100px root margin to improve highlight experience.
+    const observer = new IntersectionObserver(scrollHandler, { threshold: 1 });
+    let items = document.querySelectorAll('h1,h2,h3,h4,h5,h6');
+    items.forEach(item => observer.observe(item));
+</script>
+
+</html>
