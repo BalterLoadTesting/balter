@@ -7,3 +7,4 @@ data/
 flamegraph.svg
 perf.data*
 prometheus.yml
+/docs/public

@@ -14,7 +14,7 @@ High level features include:
 - Native metrics integration.
 - Written with efficiency in mind. Don't break the bank with load testing.
 
-Balter is a new project and still has some rough edges. It is being worked on full-time, and if you use it for your projects please reach out with any issues you run into on Github and we will try to resolve them as quickly as possible.
+Balter is a new project and still has some rough edges. The project is being worked on full time, so if you run into any issues please let us know on Github and we will try to resolve them as quickly as possible.
 
 # How It Works
 
@@ -127,7 +127,7 @@ tokio::join! {
 
 Of course, you aren't limited to just running Balter Scenarios. For example, you can make API calls to disable certain services while a load test is running. The possibilities are endless!
 
-# Distributed Runtime (Experimental)
+# Distributed Runtime
 
 Balter provides a distributed runtime if your load testing requirements are higher than what a single machine can handle. This runtime is currently in an experimental state, though stabilization is a high priority for the near future. Complete documentation can be found in [the guide](@/guide/_index.md#distributed-runtime-experimental).
 
@@ -149,7 +149,7 @@ In the background, the Balter runtime will start gossiping with peers and sharin
 
 # Native Metrics
 
-Metrics are an important part of understanding performance, and Balter natively supports metrics via the [`metrics` crate](https://github.com/metrics-rs/metrics). This means you can plug in any adapter you need to output metrics in a way that integrates with your system. For instance, Prometheus integration is as easy as adding the following:
+Metrics are an important part of understanding load performance, and Balter natively supports metrics via the [`metrics` crate](https://github.com/metrics-rs/metrics). This means you can plug in any adapter you need to output metrics in a way that integrates with your system. For instance, Prometheus integration is as easy as adding the following:
 
 ```rust
 PrometheusBuilder::new()
@@ -167,12 +167,13 @@ See [the guide](@/guide/_index.md#metrics) for more information.
 
 Balter is a brand new project, and any support is greatly appreciated!
 
-The easiest way to support Balter is by giving us a star on Github! This helps people find us and learn about the project. <a class="github-button" href="https://github.com/BalterLoadTesting/balter" data-size="large" data-show-count="true" aria-label="Star BalterLoadTesting/balter on GitHub">Star</a>
+The easiest way to support Balter is by giving us a star on Github. This helps people find us and learn about the project. <a class="github-button" href="https://github.com/BalterLoadTesting/balter" data-size="large" data-show-count="true" aria-label="Star BalterLoadTesting/balter on GitHub">Star</a>
 
 The best way to financially support Balter's development is to hire us! We provide contracting for building out your team's load testing infrastructure using Balter. You will have full access and ownership over the source code, using all Open Source technology, and have complete confidence in the performance and load characteristics of your system. At the same time, you will be supporting the project and giving us insights into how to improve the framework.
 
 If you are interested in hiring us, please reach out to <a href="mailto:consulting@balterloadtesting.com">consulting@balterloadtesting.com</a>
 
 Additionally, you can sponsor our developers on Github, which is a great way to show support, especially if there are features you're interested in seeing added!
-<iframe src="https://github.com/sponsors/byronwasti/card" title="Sponsor byronwasti" height="100" width="600" style="border: 0;"></iframe>
+<iframe id="sponsor-big" src="https://github.com/sponsors/byronwasti/card" title="Sponsor byronwasti" height="100" width="600" style="border: 0;"></iframe>
+<iframe id="sponsor-small" src="https://github.com/sponsors/byronwasti/button" title="Sponsor byronwasti" height="32" width="114" style="border: 0; border-radius: 6px;"></iframe>
 
