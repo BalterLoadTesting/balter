@@ -24,7 +24,7 @@ async fn scenario_foo() {
 
 
 ### Current Restrictions
-- `#[scenario]` can only be used on functions which take and return no arguments ([issue #1](https://github.com/BalterLoadTesting/balter/issues/1))
+- `#[scenario]` can only be used on functions which take and return no arguments ( {{issue(id="1")}})
 
 ## Transactions
 
@@ -76,7 +76,6 @@ async fn call_api(client: &Client) -> Result<(), Error> {
 }
 ```
 
-# Composability
-
 # Distributed Runtime (Experimental)
 
+# Metrics

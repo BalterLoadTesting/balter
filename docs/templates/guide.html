@@ -6,6 +6,10 @@
 </header>
 {% endblock header %}
 
+{% block content %}
+{{ section.content | safe }}
+{% endblock content %}
+
 {% block footer %}
 <footer>
     <small class="subtext">

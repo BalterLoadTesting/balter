@@ -4,42 +4,65 @@ template = "index.html"
 +++
 
 # Balter
-<b>B</b>alter, <b>A</b> <b>L</b>oad <b>T</b>est<b>ER</b>, is a distributed load testing framework designed to make testing high-traffic scenarios easy. Load test scenarios are written using standard Rust code, with a few special attributes thrown in. Balter makes no assumptions about the service under test, and can be used for a variety of use-cases, from HTTP services to local key-value stores written in any language.
+<b>B</b>alter, <b>A</b> <b>L</b>oad <b>T</b>est<b>ER</b>, is a distributed load testing framework designed to make testing high-traffic scenarios easy. Load test scenarios are written using standard Rust code with a few special attributes thrown in. Balter makes no assumptions about the service under test, and can be used for a variety of use-cases, from HTTP services to local key-value stores written in any language.
+
+High level features include:
 
 - Flexible and composable testing via Scenario and Transaction abstractions.
-- Constrain load tests with max TPS, latency or error rate (including all three at once).
-- Distributed runtime in just a few lines of code.*
-- Native integration with Prometheus for easy metrics in Grafana.
+- Constrain load tests with TPS, latency or error rate (including all three at once).
+- Distributed runtime in just a few lines of code.
+- Native metrics integration.
 - Written with efficiency in mind. Don't break the bank with load testing.
 
-\* Experimental feature, but high priority for stabilizing!
-
+Balter is a new project and still has some rough edges. It is being worked on full-time, and if you use it for your projects please reach out with any issues you run into on Github and we will try to resolve them as quickly as possible.
 
 # How It Works
 
-At its core, Balter provides tooling to take an arbitrary Rust function and scale it. The two abstractions Balter provides are the *Scenario*, an async Rust function with the `#[scenario]` attribute, and the *Transaction*, an async Rust function with the `#[transaction]` attribute:
+At its core, Balter provides tooling to take an arbitrary Rust function and run it repeatedly in parallel, with constraints applied. The two abstractions Balter provides are the *Scenario*, an async Rust function with the `#[scenario]` attribute, and the *Transaction*, an async Rust function with the `#[transaction]` attribute:
 
 ```rust
 #[scenario]
 async fn test_scaling_functionality() {
+    let client = reqwest::Client::new();
     loop {
-        foo_transaction().await;
+        foo_transaction(&client).await;
+
+        for _ in 0..10 {
+            bar_transaction(&client).await;
+        }
     }
 }
 
 #[transaction]
-async fn foo_transaction() -> Result<()> {
-    // Service call would go here
+async fn foo_transaction(client: &Client) -> Result<()> {
+    client.post("https://example.com/api/foo")
+        .json(...)
+        .send().await?;
+    Ok(())
+}
+
+#[transaction]
+async fn bar_transaction(client: &Client) -> Result<()> {
+    client.post("https://example.com/api/bar")
+        .json(...)
+        .send().await?;
     Ok(())
 }
 ```
 
-A *Scenario* supercharges a Rust function with additional methods related to load testing. All of the methods run multiple instances of the function in parallel, while keeping track of various statistical data around the transactions. Balter provides the following methods for a Scenario:
+A *Scenario* supercharges a Rust function with additional methods related to load testing. The simplest to understand is the `.tps()` method, which will run the function in parallel and constrain the rate of transactions such that the transactions per second (TPS) is equal to the value you set:
+```rust
+test_scaling_functionality()
+    .tps(10_000)
+    .await;
+```
+
+All of the methods run multiple instances of the function in parallel, while keeping track of statistical data for the transactions. Balter currently provides the following methods for a Scenario:
 
 - `.tps(u32)` Run a Scenario such that the transactions per second is equal to the value set.
-- `.error_rate(f64)` Run a Scenario such that the error rate is equal to the value set.
-- `.latency(Duration, f64)` Run a Scenario given a latency and a percentile.
-- `.duration(Duration)` Limit the Scenario to run for a given Duration (otherwise it runs indefinitely)
+- `.error_rate(f64)` Constrain transaction rate to an average error rate.
+- `.latency(Duration, f64)` Constrain transaction rate to a specific latency at a given percentile.
+- `.duration(Duration)` Limit the Scenario to run for a given Duration (by default it runs indefinitely)
 
 These methods can be used together. For example, let's say you want to scale a function to achieve a p90 latency of 200ms, but not go over 10,000 TPS or an error rate of 3%, and run it for 3600s:
 ```rust
@@ -51,11 +74,13 @@ test_scaling_functionality()
     .await;
 ```
 
+There is more to say about the core primitives of Balter and certain restrictions they currently have. Please see [the guide](@/guide/_index.md) for a more in-depth guide to using Balter.
+
 # Composability
 
 What sets Balter apart from other load testing frameworks like JMeter or Locust is composability. Scenarios are normal async Rust functions, and this opens up a world of flexibility.
 
-For example, say you want to run a series of load tests, you can run Scenarios in series:
+For example, say you want to run a set of load tests, you can run Scenarios in series calling them like normal functions:
 ```rust
 test_normal_user_load()
     .tps(10_000)
@@ -71,7 +96,7 @@ test_edge_cases()
     .await;
 ```
 
-Where things get interesting is the ability to run Scenarios in parallel, using the standard Tokio `join!` macro:
+Where things get interesting is the ability to run Scenarios in parallel, using the standard Tokio `join!` macro. For instance, being able to set up a baseline amount of load against your service, and then slamming it with high traffic for a few minutes, is made simple with Balter:
 
 ```rust
 tokio::join! {
@@ -100,40 +125,47 @@ tokio::join! {
 }
 ```
 
-Of course, you aren't limited to just running Balter Scenarios. For instance, you can make API calls to disable certain services while a load test is running.
-
-To learn more, and see advanced Balter strategies, see [the guide](@/guide/_index.md).
+Of course, you aren't limited to just running Balter Scenarios. For example, you can make API calls to disable certain services while a load test is running. The possibilities are endless!
 
 # Distributed Runtime (Experimental)
 
-Balter provides an distributed runtime if your load testing requirements are higher than what a single machine can handle. This runtime is currently in an experimental state, though stabilization is a high priority for the near future. To get started with the distributed runtime, you will need to opt-in to the `"rt"` feature (and include `linkme` as a dependency):
+Balter provides a distributed runtime if your load testing requirements are higher than what a single machine can handle. This runtime is currently in an experimental state, though stabilization is a high priority for the near future. Complete documentation can be found in [the guide](@/guide/_index.md#distributed-runtime-experimental).
 
-```toml
-# Cargo.toml
-balter = { version = "0.0.5", features = ["rt"] }
-linkme = "0.3"
-```
-
-Then, rather than calling a Scenario from your `main()` function, you instantiate the Runtime, which will automatically hook into the various Scenario's you have.
+Currently, the runtime just needs a port and at least a single peer (in order to start gossiping with). Then, rather than calling a Scenario from your `main()` function, you instantiate the Runtime, which will automatically hook into the various Scenario's you have.
 
 ```rust
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     BalterRuntime::new()
-        .with_args()
+        .port(7621) // default
+        .peers(&["192.168.0.1".parse()?])
         .run()
         .await;
 }
 ```
 
-In the background, the Balter runtime starts an HTTP server which you can send requests to. In order to kick off a Scenario, you simply send an HTTP request.
+In the background, the Balter runtime will start gossiping with peers and sharing work. In order to kick off a Scenario, you simply send an HTTP request to any Balter server, and everything else will be handled automatically. [The guide](@/guide/_index.md#distributed-runtime-experimental) covers more information on the distributed runtime, and the caveats that currently exist.
 
-More about this topic is covered in the [guide](@/guide/_index.md#distributed-runtime-experimental).
 
 # Native Metrics
 
+Metrics are an important part of understanding performance, and Balter natively supports metrics via the [`metrics` crate](https://github.com/metrics-rs/metrics). This means you can plug in any adapter you need to output metrics in a way that integrates with your system. For instance, Prometheus integration is as easy as adding the following:
+
+```rust
+PrometheusBuilder::new()
+    .with_http_listener("0.0.0.0:8002".parse::<SocketAddr>()?)
+    .install()?;
+```
+
+The metrics output by Balter include statistical information on TPS, latency, error-rates as well as information on the inner workings of Balter (such as the concurrency and controller states).
+
+{{ resize_image(path="/static/balter-metrics-demo-1.png", width=5000, height=5000, op="fit") }}
+
+See [the guide](@/guide/_index.md#metrics) for more information.
 
 # Support
+
+Balter is a brand new project, and any support is greatly appreciated!
 
 The easiest way to support Balter is by giving us a star on Github! This helps people find us and learn about the project. <a class="github-button" href="https://github.com/BalterLoadTesting/balter" data-size="large" data-show-count="true" aria-label="Star BalterLoadTesting/balter on GitHub">Star</a>
 

@@ -82,10 +82,14 @@ async fn main() {
 
     .hero-wrapper {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: no-wrap;
     }
 </style>
 {% endblock hero %}
+
+{% block content %}
+{{ section.content | safe }}
+{% endblock content %}
 
 {% block footer %}
 <footer>
