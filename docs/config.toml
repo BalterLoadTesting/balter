@@ -1,6 +1,8 @@
 # The URL the site will be built for
 base_url = "https://www.balterloadtesting.com"
 
+title = "Balter Load Testing"
+
 # Whether to automatically compile all Sass files in the sass directory
 compile_sass = true
 
@@ -16,7 +18,7 @@ highlight_code = true
 
 [extra]
 juice_logo_name = "Balter"
-juice_logo_path = "balter.svg"
+juice_logo_path = "logo.svg"
 juice_extra_menu = [
     { title = "Blog", link = "/blog"},
     { title = "Guide", link = "/guide"},
