@@ -1,8 +1,6 @@
 //! Scenario logic and constants
 use crate::controllers::{CompositeController, Controller};
-use balter_core::{
-    RunStatistics, ScenarioConfig, DEFAULT_OVERLOAD_ERROR_RATE, DEFAULT_SATURATE_ERROR_RATE,
-};
+use balter_core::{RunStatistics, ScenarioConfig};
 #[cfg(feature = "rt")]
 use balter_runtime::runtime::{RuntimeMessage, BALTER_OUT};
 use std::{
@@ -63,8 +61,6 @@ where
 }
 
 pub trait ConfigurableScenario<T: Send>: Future<Output = T> + Sized + Send {
-    fn saturate(self) -> Self;
-    fn overload(self) -> Self;
     fn error_rate(self, error_rate: f64) -> Self;
     fn tps(self, tps: NonZeroU32) -> Self;
     fn latency(self, latency: Duration, quantile: f64) -> Self;
@@ -76,78 +72,6 @@ where
     T: Fn() -> F + Send + 'static + Clone + Sync,
     F: Future<Output = ()> + Send,
 {
-    /// Run the scenario increasing TPS until an error rate of 3% is reached.
-    ///
-    /// # Example
-    /// ```no_run
-    /// use balter::prelude::*;
-    /// use std::time::Duration;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     my_scenario()
-    ///         .saturate()
-    ///         .duration(Duration::from_secs(120))
-    ///         .await;
-    /// }
-    ///
-    /// #[scenario]
-    /// async fn my_scenario() {
-    /// }
-    /// ```
-    fn saturate(mut self) -> Self {
-        self.config.error_rate = Some(DEFAULT_SATURATE_ERROR_RATE);
-        self
-    }
-
-    /// Run the scenario increasing TPS until an error rate of 80% is reached.
-    ///
-    /// # Example
-    /// ```no_run
-    /// use balter::prelude::*;
-    /// use std::time::Duration;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     my_scenario()
-    ///         .overload()
-    ///         .duration(Duration::from_secs(120))
-    ///         .await;
-    /// }
-    ///
-    /// #[scenario]
-    /// async fn my_scenario() {
-    /// }
-    /// ```
-    fn overload(mut self) -> Self {
-        self.config.error_rate = Some(DEFAULT_OVERLOAD_ERROR_RATE);
-        self
-    }
-
-    /// Run the scenario increasing TPS until a custom error rate is reached.
-    ///
-    /// # Example
-    /// ```no_run
-    /// use balter::prelude::*;
-    /// use std::time::Duration;
-    ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     my_scenario()
-    ///         .error_rate(0.25) // 25% error rate
-    ///         .duration(Duration::from_secs(120))
-    ///         .await;
-    /// }
-    ///
-    /// #[scenario]
-    /// async fn my_scenario() {
-    /// }
-    /// ```
-    fn error_rate(mut self, error_rate: f64) -> Self {
-        self.config.error_rate = Some(error_rate);
-        self
-    }
-
     /// Run the scenario at the specified TPS.
     ///
     /// # Example
@@ -170,6 +94,39 @@ where
     /// ```
     fn tps(mut self, tps: NonZeroU32) -> Self {
         self.config.max_tps = Some(tps);
+        self
+    }
+
+    /// Run the scenario increasing TPS until a custom error rate is reached.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use balter::prelude::*;
+    /// use std::time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     my_scenario()
+    ///         .error_rate(0.25) // 25% error rate
+    ///         .duration(Duration::from_secs(120))
+    ///         .await;
+    /// }
+    ///
+    /// #[scenario]
+    /// async fn my_scenario() {
+    /// }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the error_rate is not between 0 and 1.
+    fn error_rate(mut self, error_rate: f64) -> Self {
+        if !(0. ..=1.).contains(&error_rate) {
+            panic!(
+                "Specified error rate must be between 0 and 1. Value provided was {error_rate}."
+            );
+        }
+        self.config.error_rate = Some(error_rate);
         self
     }
 
