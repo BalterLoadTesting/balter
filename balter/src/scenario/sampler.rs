@@ -250,9 +250,9 @@ where
 
     pub(crate) async fn wait_for_shutdown(mut self) {
         self.concurrency.store(0, Ordering::Relaxed);
+        self.populate_jobs();
         for task in self.tasks.drain(..) {
-            // TODO: Timeout in case a scenario loops indefinitely
-            task.await.expect("Task unexpectedly failed.");
+            let _ = task.await;
         }
     }
 
@@ -260,9 +260,9 @@ where
         let concurrent_count = self.concurrency.load(Ordering::Relaxed);
 
         if self.tasks.len() > concurrent_count {
-            // TODO: Clean up the tasks cleanly + timeout/abort in case a scenario loops
-            // indefinitely
-            self.tasks.truncate(concurrent_count);
+            for handle in self.tasks.drain(concurrent_count..) {
+                handle.abort();
+            }
         } else {
             while self.tasks.len() < concurrent_count {
                 let scenario = self.scenario.clone();
