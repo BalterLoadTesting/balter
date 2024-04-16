@@ -62,7 +62,7 @@ where
 
 pub trait ConfigurableScenario<T: Send>: Future<Output = T> + Sized + Send {
     fn error_rate(self, error_rate: f64) -> Self;
-    fn tps(self, tps: NonZeroU32) -> Self;
+    fn tps(self, tps: u32) -> Self;
     fn latency(self, latency: Duration, quantile: f64) -> Self;
     fn duration(self, duration: Duration) -> Self;
 }
@@ -78,13 +78,12 @@ where
     /// ```no_run
     /// use balter::prelude::*;
     /// use std::time::Duration;
-    /// use std::num::NonZeroU32;
     ///
     /// #[tokio::main]
     /// async fn main() {
     ///     my_scenario()
-    ///         .tps(NonZeroU32::new(632).unwrap())
-    ///         .duration(Duration::from_secs(120))
+    ///         // Scale scenario until 5K TPS
+    ///         .tps(5_000)
     ///         .await;
     /// }
     ///
@@ -92,8 +91,13 @@ where
     /// async fn my_scenario() {
     /// }
     /// ```
-    fn tps(mut self, tps: NonZeroU32) -> Self {
-        self.config.max_tps = Some(tps);
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the provided TPS is zero
+    fn tps(mut self, tps: u32) -> Self {
+        self.config.max_tps =
+            Some(NonZeroU32::new(tps).expect("TPS provided must be non-zero. Given: {tps}"));
         self
     }
 
@@ -107,8 +111,8 @@ where
     /// #[tokio::main]
     /// async fn main() {
     ///     my_scenario()
-    ///         .error_rate(0.25) // 25% error rate
-    ///         .duration(Duration::from_secs(120))
+    ///         // Scale scenario until 25% error rate
+    ///         .error_rate(0.25)
     ///         .await;
     /// }
     ///
@@ -165,7 +169,8 @@ where
 
     /// Run the scenario for the given duration.
     ///
-    /// NOTE: Must include one of `.tps()`/`.saturate()`/`.overload()`/`.error_rate()`
+    /// NOTE: This method doesn't make much sense without one of the other
+    /// load-testing methods (`tps()`/`error_rate()`/`latency()`)
     ///
     /// # Example
     /// ```no_run
@@ -176,7 +181,7 @@ where
     /// #[tokio::main]
     /// async fn main() {
     ///     my_scenario()
-    ///         .tps(NonZeroU32::new(10).unwrap())
+    ///         .tps(10_000)
     ///         .duration(Duration::from_secs(120))
     ///         .await;
     /// }
@@ -244,18 +249,23 @@ where
             }
         }
     }
-    sampler.wait_for_shutdown().await;
-
-    info!("Scenario complete");
+    let sampler_stats = sampler.wait_for_shutdown().await;
 
     #[cfg(feature = "rt")]
     signal_completion().await;
 
+    info!("Scenario complete");
+
     // TODO: Fix
     RunStatistics {
-        concurrency: 1,
-        tps: NonZeroU32::new(1).unwrap(),
-        stable: true,
+        concurrency: sampler_stats.concurrency,
+        goal_tps: sampler_stats.goal_tps,
+        actual_tps: sampler_stats.final_sample_set.mean_tps(),
+        latency_p50: sampler_stats.final_sample_set.latency(0.5),
+        latency_p90: sampler_stats.final_sample_set.latency(0.9),
+        latency_p99: sampler_stats.final_sample_set.latency(0.99),
+        error_rate: sampler_stats.final_sample_set.mean_err(),
+        tps_limited: sampler_stats.tps_limited,
     }
 }
 

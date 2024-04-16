@@ -87,19 +87,11 @@ async fn my_nested_scenario() {
 What makes scenarios different from regular async functions is that they have additional methods allowing you to specify load testing functionality.
 
 - `.tps(u32)` Run a scenario at a specified TPS
-- `.saturate()` Run a scenario, increasing the TPS until a 3% error rate
-- `.overload()` Run a scenario, increasing the TPS until an 80% error rate
 - `.error_rate(f64)` Run a scenario, increasing the TPS until a custom error rate
 
 ```rust,ignore
 // Run scenario at 300 TPS for 30 seconds
 my_scenario().tps(300u32).duration(Duration::from_secs(30)).await;
-
-// Increase TPS until we see an error rate of 3% for 120 seconds
-my_scenario().saturate().duration(Duration::from_secs(120)).await;
-
-// Increase TPS until we see an error rate of 80% for 120 seconds
-my_scenario().overload().duration(Duration::from_secs(120)).await;
 
 // Run a scenario increasing the TPS until a specified error rate:
 // Increase TPS until we see an error rate of 25% for 120 seconds
@@ -110,17 +102,16 @@ You can run scenarios together for more complicated load test scenarios using st
 
 ```rust,ignore
 use balter::prelude::*;
-use std::num::NonZeroU32;
 
 #[scenario]
 async fn my_root_scenario() {
     // In series
-    my_scenario_a().tps(NonZeroU32::new(300).unwrap()).duration(Duration::from_secs(120));
+    my_scenario_a().tps(300).duration(Duration::from_secs(120));
     my_scenario_b().saturate().duration(Duration::from_secs(120));
 
     // In parallel
     tokio::join! {
-        my_scenario_a().tps(NonZeroU32::new(300).unwrap()).duration(Duration::from_secs(120)),
+        my_scenario_a().tps(300).duration(Duration::from_secs(120)),
         my_scenario_b().saturate().duration(Duration::from_secs(120)),
     }
 }
@@ -133,17 +124,16 @@ All put together, a simple single-server load test looks like the following:
 ```rust,no_run
 use balter::prelude::*;
 use std::time::Duration;
-use std::num::NonZeroU32;
 
 #[tokio::main]
 async fn main() {
     my_scenario()
-        .tps(NonZeroU32::new(500).unwrap())
+        .tps(500)
         .duration(Duration::from_secs(30))
         .await;
 
     my_scenario()
-        .saturate()
+        .error_rate(0.03)
         .duration(Duration::from_secs(120))
         .await;
 }

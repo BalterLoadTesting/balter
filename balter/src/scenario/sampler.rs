@@ -27,7 +27,7 @@ const SKIP_SIZE: usize = 25;
 // be good to remove this tricky area.
 pub(crate) struct ConcurrentSampler<T> {
     base_label: String,
-    tps_sampler: Sampler<T>,
+    sampler: Sampler<T>,
     cc: ConcurrencyController,
     samples: SampleSet,
     needs_clear: bool,
@@ -42,7 +42,7 @@ where
     pub(crate) fn new(name: &str, scenario: T, goal_tps: NonZeroU32) -> Self {
         let new = Self {
             base_label: format!("balter_{name}"),
-            tps_sampler: Sampler::new(scenario, goal_tps),
+            sampler: Sampler::new(scenario, goal_tps),
             cc: ConcurrencyController::new(goal_tps),
             samples: SampleSet::new(SAMPLE_WINDOW_SIZE).skip_first_n(SKIP_SIZE),
             needs_clear: false,
@@ -67,7 +67,7 @@ where
             self.needs_clear = false;
         }
 
-        self.tps_sampler.sample(&mut self.samples).await;
+        self.sampler.sample(&mut self.samples).await;
 
         if self.samples.full() {
             let stable = match self.cc.analyze(&self.samples) {
@@ -112,25 +112,32 @@ where
     }
 
     pub fn goal_tps(&self) -> NonZeroU32 {
-        self.tps_sampler.tps_limit
+        self.sampler.tps_limit
     }
 
     pub fn set_goal_tps(&mut self, goal_tps: NonZeroU32) {
-        if self.tps_limited && goal_tps > self.tps_sampler.tps_limit {
+        if self.tps_limited && goal_tps > self.sampler.tps_limit {
             trace!("Unable to set TPS; TPS is limited");
         } else {
             self.set_goal_tps_unchecked(goal_tps);
         }
     }
 
-    pub async fn wait_for_shutdown(self) {
-        self.tps_sampler.wait_for_shutdown().await;
+    pub async fn wait_for_shutdown(self) -> OutputStats {
+        let stats = OutputStats {
+            goal_tps: self.goal_tps(),
+            concurrency: self.sampler.concurrency.load(Ordering::Relaxed),
+            final_sample_set: self.samples,
+            tps_limited: self.tps_limited,
+        };
+        self.sampler.wait_for_shutdown().await;
+        stats
     }
 
     fn set_concurrency(&mut self, concurrency: usize) {
         self.needs_clear = true;
         trace!("Setting concurrency to: {concurrency}");
-        self.tps_sampler.set_concurrency(concurrency);
+        self.sampler.set_concurrency(concurrency);
 
         if cfg!(feature = "metrics") {
             metrics::gauge!(format!("{}_concurrency", &self.base_label)).set(concurrency as f64);
@@ -138,10 +145,10 @@ where
     }
 
     fn set_goal_tps_unchecked(&mut self, goal_tps: NonZeroU32) {
-        if goal_tps != self.tps_sampler.tps_limit {
+        if goal_tps != self.sampler.tps_limit {
             self.needs_clear = true;
             self.cc.set_goal_tps(goal_tps);
-            self.tps_sampler.set_tps_limit(goal_tps);
+            self.sampler.set_tps_limit(goal_tps);
 
             if cfg!(feature = "metrics") {
                 self.goal_tps_metric(goal_tps);
@@ -153,6 +160,13 @@ where
     fn goal_tps_metric(&self, goal_tps: NonZeroU32) {
         metrics::gauge!(format!("{}_goal_tps", &self.base_label)).set(goal_tps.get());
     }
+}
+
+pub(crate) struct OutputStats {
+    pub goal_tps: NonZeroU32,
+    pub concurrency: usize,
+    pub final_sample_set: SampleSet,
+    pub tps_limited: bool,
 }
 
 pub(crate) struct Sampler<T> {
@@ -338,8 +352,8 @@ mod tests {
         tps_sampler.sample(&mut samples).await;
         for _ in 0..10 {
             tps_sampler.sample(&mut samples).await;
-            info!("tps: {}", samples.mean_tps().unwrap());
-            assert!((1_000. - samples.mean_tps().unwrap()).abs() < 150.);
+            info!("tps: {}", samples.mean_tps());
+            assert!((1_000. - samples.mean_tps()).abs() < 150.);
         }
     }
 
@@ -355,8 +369,8 @@ mod tests {
         tps_sampler.sample(&mut samples).await;
         for _ in 0..10 {
             tps_sampler.sample(&mut samples).await;
-            info!("tps: {}", samples.mean_tps().unwrap());
-            assert!((1_000. - samples.mean_tps().unwrap()).abs() < 150.);
+            info!("tps: {}", samples.mean_tps());
+            assert!((1_000. - samples.mean_tps()).abs() < 150.);
         }
     }
 }

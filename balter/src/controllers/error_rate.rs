@@ -48,7 +48,7 @@ impl Controller for ErrorRateController {
 
     fn limit(&mut self, samples: &SampleSet, stable: bool) -> NonZeroU32 {
         // TODO: Remove panic; this can be a type-safe check
-        let sample_error_rate = samples.mean_err().expect("Invalid number of samples");
+        let sample_error_rate = samples.mean_err();
 
         let (new_goal_tps, new_state) = match self.check_bounds(sample_error_rate) {
             Bounds::Under => match self.state {
@@ -75,7 +75,7 @@ impl Controller for ErrorRateController {
                     State::BigStep | State::SmallStep(_) => {
                         trace!("At bounds w/ BigStep|SmallStep.");
                         // TODO: Remove unwraps
-                        let samples_tps = samples.mean_tps().unwrap();
+                        let samples_tps = samples.mean_tps();
                         (convert_to_nonzerou32(samples_tps).unwrap(), State::Stable)
                     }
                     s @ State::Stable => {

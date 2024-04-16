@@ -1,6 +1,5 @@
 use balter::prelude::*;
 use reqwest::Client;
-use std::num::NonZeroU32;
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -15,7 +14,7 @@ async fn main() {
         .init();
 
     scenario_a()
-        .tps(NonZeroU32::new(10_000).unwrap())
+        .tps(10_000)
         .duration(Duration::from_secs(120))
         .await;
 }

@@ -1,5 +1,4 @@
 use balter::prelude::*;
-use std::num::NonZeroU32;
 use std::time::Duration;
 use tracing::info;
 
@@ -17,12 +16,8 @@ async fn main() {
 #[scenario]
 async fn root_scenario() {
     tokio::join!(
-        scenario_a()
-            .tps(NonZeroU32::new(500).unwrap())
-            .duration(Duration::from_secs(30)),
-        scenario_b()
-            .tps(NonZeroU32::new(1000).unwrap())
-            .duration(Duration::from_secs(30)),
+        scenario_a().tps(500).duration(Duration::from_secs(30)),
+        scenario_b().tps(1000).duration(Duration::from_secs(30)),
     );
 
     info!("Complete?");

@@ -10,7 +10,7 @@ async fn main() {
         .init();
 
     scenario_a()
-        .saturate()
+        .error_rate(0.03)
         .duration(Duration::from_secs(120))
         .await;
 }

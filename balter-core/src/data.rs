@@ -4,7 +4,7 @@ use std::time::Duration;
 
 const TDIGEST_BACKLOG_SIZE: usize = 100;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SampleSet {
     samples: VecDeque<SampleData>,
     latency: TDigest<K1>,
@@ -71,24 +71,14 @@ impl SampleSet {
         self.samples.len() == self.window_size
     }
 
-    // TODO: Rather than return Option, we can have a method which returns a "Full" SampleSet with
-    // non-optional return values here
-    pub fn mean_err(&self) -> Option<f64> {
-        if self.samples.len() == self.window_size {
-            let sum: f64 = self.samples.iter().map(SampleData::error_rate).sum();
-            Some(sum / self.samples.len() as f64)
-        } else {
-            None
-        }
+    pub fn mean_err(&self) -> f64 {
+        let sum: f64 = self.samples.iter().map(SampleData::error_rate).sum();
+        sum / self.samples.len() as f64
     }
 
-    pub fn mean_tps(&self) -> Option<f64> {
-        if self.samples.len() == self.window_size {
-            let sum: f64 = self.samples.iter().map(SampleData::tps).sum();
-            Some(sum / self.samples.len() as f64)
-        } else {
-            None
-        }
+    pub fn mean_tps(&self) -> f64 {
+        let sum: f64 = self.samples.iter().map(SampleData::tps).sum();
+        sum / self.samples.len() as f64
     }
 
     pub fn latency(&self, quantile: f64) -> Duration {
