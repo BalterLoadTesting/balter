@@ -19,6 +19,7 @@ juice_logo_name = "Balter"
 juice_logo_path = "balter.svg"
 juice_extra_menu = [
     { title = "Blog", link = "/blog"},
+    { title = "Guide", link = "/guide"},
     { title = "Docs", link = "https://docs.rs/balter/0.4.0/balter/"},
     { title = "Crates.io", link = "https://crates.io/crates/balter"},
     { title = "Github", link = "https://github.com/BalterLoadTesting/balter"},
