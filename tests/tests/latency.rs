@@ -11,20 +11,18 @@ mod tests {
     use std::num::NonZeroU32;
     use std::sync::OnceLock;
     use std::time::Duration;
-    use tracing::debug;
 
     #[tokio::test]
     async fn single_instance_latency() {
         init().await;
 
         let stats = latency_200ms_scenario()
-            .latency(Duration::from_millis(200), 0.9)
-            //.duration(Duration::from_secs(60))
+            .latency(Duration::from_millis(130), 0.9)
+            .duration(Duration::from_secs(300))
             .await;
 
-        assert!(dbg!(stats.tps.get()) <= 2_300);
-        assert!(dbg!(stats.tps.get()) >= 1_900);
-        assert!(stats.concurrency >= 2);
+        assert!(dbg!(stats.latency_p90) > Duration::from_millis(120));
+        assert!(dbg!(stats.latency_p90) < Duration::from_millis(140));
     }
 
     static CLIENT: OnceLock<Client> = OnceLock::new();

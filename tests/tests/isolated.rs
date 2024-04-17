@@ -8,20 +8,25 @@ mod tests {
 
     use balter::prelude::*;
     use reqwest::Client;
-    use std::num::NonZeroU32;
     use std::sync::OnceLock;
     use std::time::Duration;
+
+    #[tokio::test]
+    async fn transparent_scenario_call() {
+        let _ = scenario_1ms_delay().await;
+    }
 
     #[tokio::test]
     async fn single_instance_tps() {
         init().await;
 
         let stats = scenario_1ms_delay()
-            .tps(NonZeroU32::new(10_000).unwrap())
-            //.duration(Duration::from_secs(30))
+            .tps(10_000)
+            .duration(Duration::from_secs(30))
             .await;
 
-        assert_eq!(stats.tps.get(), 10_000);
+        assert_eq!(stats.goal_tps, 10_000);
+        assert!(stats.actual_tps > 9_500.);
         assert!(stats.concurrency >= 10);
     }
 
@@ -30,11 +35,12 @@ mod tests {
         init().await;
 
         let stats = scenario_1ms_limited_7000()
-            .tps(NonZeroU32::new(10_000).unwrap())
-            //.duration(Duration::from_secs(60))
+            .tps(10_000)
+            .duration(Duration::from_secs(120))
             .await;
 
-        assert!(dbg!(stats.tps.get()) <= 7_100);
+        assert!(dbg!(stats.goal_tps) <= 7_100);
+        assert!(dbg!(stats.actual_tps) > 6_500.);
         assert!(stats.concurrency >= 10);
     }
 
@@ -42,15 +48,15 @@ mod tests {
     async fn single_instance_error_rate() {
         init().await;
 
-        tokio::time::sleep(Duration::from_secs(15)).await;
-
         let stats = scenario_1ms_max_2000()
-            .saturate()
-            //.duration(Duration::from_secs(60))
+            .error_rate(0.03)
+            .duration(Duration::from_secs(360))
             .await;
 
-        assert!(dbg!(stats.tps.get()) <= 2_300);
-        assert!(dbg!(stats.tps.get()) >= 1_900);
+        assert!(dbg!(stats.error_rate) > 0.0);
+        assert!(dbg!(stats.error_rate) < 0.07);
+        assert!(dbg!(stats.goal_tps) <= 1_400);
+        assert!(dbg!(stats.goal_tps) >= 1_200);
         assert!(stats.concurrency >= 2);
     }
 
@@ -94,7 +100,7 @@ mod tests {
     async fn transaction_1ms_max_2000() -> anyhow::Result<()> {
         let client = CLIENT.get_or_init(Client::new);
         let res = client
-            .get("http://0.0.0.0:3002/max/2000/delay/ms/1/scenario/0")
+            .get("http://0.0.0.0:3002/max/1300/delay/ms/1/scenario/0")
             .send()
             .await?;
 

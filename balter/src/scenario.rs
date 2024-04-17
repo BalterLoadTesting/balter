@@ -226,6 +226,14 @@ where
     T: Fn() -> F + Send + Sync + 'static + Clone,
     F: Future<Output = ()> + Send,
 {
+    if config.is_unconfigured() {
+        debug!(
+            "Not load testing {} with config {:?}, because it has no work to do.",
+            config.name, &config
+        );
+        return RunStatistics::default();
+    }
+
     info!("Running {} with config {:?}", config.name, &config);
 
     let start = Instant::now();
@@ -236,16 +244,18 @@ where
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
     loop {
         if let (stable, Some(samples)) = sampler.get_samples().await {
+            // NOTE: We have our break-out inside this branch so that our final sampler_stats are
+            // accurate.
+            if let Some(duration) = config.duration {
+                if start.elapsed() > duration {
+                    break;
+                }
+            }
+
             let new_goal_tps = controllers.limit(samples, stable);
 
             if new_goal_tps < sampler.goal_tps() || stable {
                 sampler.set_goal_tps(new_goal_tps);
-            }
-        }
-
-        if let Some(duration) = config.duration {
-            if start.elapsed() > duration {
-                break;
             }
         }
     }
@@ -256,10 +266,9 @@ where
 
     info!("Scenario complete");
 
-    // TODO: Fix
     RunStatistics {
         concurrency: sampler_stats.concurrency,
-        goal_tps: sampler_stats.goal_tps,
+        goal_tps: sampler_stats.goal_tps.get(),
         actual_tps: sampler_stats.final_sample_set.mean_tps(),
         latency_p50: sampler_stats.final_sample_set.latency(0.5),
         latency_p90: sampler_stats.final_sample_set.latency(0.9),

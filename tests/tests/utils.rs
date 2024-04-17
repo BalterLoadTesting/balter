@@ -21,9 +21,7 @@ pub async fn init() {
 
         FmtSubscriber::builder()
             .with_max_level(Level::DEBUG)
-            .with_env_filter(
-                "balter-tests=trace,balter=trace,mock_service=debug,axum::rejection=trace",
-            )
+            .with_env_filter("balter=trace,mock_service=debug,axum::rejection=trace")
             .init();
 
         PrometheusBuilder::new()

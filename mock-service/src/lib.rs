@@ -220,18 +220,15 @@ pub async fn max(
         if let Some(limiter) = MAX_MAP.read().unwrap().get(&scenario_name) {
             match limiter.check() {
                 Ok(_) => {
-                    debug!("MOCK SERVER ___ OK");
                     return Ok(());
                 }
                 Err(_) => {
-                    debug!("MOCK SERVER ___ ERR");
                     return Err(StatusCode::INTERNAL_SERVER_ERROR);
                 }
             }
         }
     }
 
-    debug!("MOCK SERVER ___ START");
     MAX_MAP
         .write()
         .unwrap()

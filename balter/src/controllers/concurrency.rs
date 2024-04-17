@@ -30,7 +30,7 @@ impl ConcurrencyController {
             // TODO: Better numerical conversions
             let ratio = goal_tps.get() as f64 / self.goal_tps.get() as f64;
             let new_concurrency =
-                (ratio * self.concurrency as f64).min(STARTING_CONCURRENCY_COUNT as f64);
+                (ratio * self.concurrency as f64 + 1.).max(STARTING_CONCURRENCY_COUNT as f64);
             new_concurrency as usize
         };
 

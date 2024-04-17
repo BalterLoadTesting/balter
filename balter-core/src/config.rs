@@ -32,6 +32,16 @@ impl ScenarioConfig {
         }
     }
 
+    pub fn is_unconfigured(&self) -> bool {
+        // NOTE: Technically just setting `duration` should do _something_,
+        // but its realistically an edge-case.
+        #[allow(clippy::match_like_matches_macro)]
+        match (self.max_tps, self.error_rate, self.latency) {
+            (None, None, None) => true,
+            _ => false,
+        }
+    }
+
     pub fn starting_tps(&self) -> Option<NonZeroU32> {
         match self {
             ScenarioConfig {

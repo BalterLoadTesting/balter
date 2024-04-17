@@ -10,11 +10,8 @@ prep:
 version EXECUTE='':
     cargo release version --exclude balter-tests --exclude mock-service --exclude examples minor {{EXECUTE}}
 
-publish:
-    cd balter-macros && cargo publish
-    cd balter-core && cargo publish
-    cd balter-runtime && cargo publish
-    cd balter && cargo publish
+publish EXECUTE='':
+    cargo release --exclude balter-tests --exclude mock-service --exclude examples {{EXECUTE}}
 
 integration TEST='':
-    cargo test --release --features integration {{TEST}}
+    cargo test --release --features integration {{TEST}} -- --nocapture --test-threads 1
