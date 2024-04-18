@@ -220,7 +220,7 @@ The list of metrics is as follows:
 | Advanced Internals Metrics:      |                                         |                                       |
 | `balter_{scenario}_lc_goal_tps`  | Set-point for TPS (LatencyController)   | Integer                               |
 | `balter_{scenario}_erc_goal_tps` | Set-point for TPS (ErrorRateController) | Integer                               |
-| `balter_{scenario}_cc_state`     | ConcurrencyController state             | 0: Stable, 1: Working, 2: TPS Limited |
+| `balter_{scenario}_cc_state`     | ConcurrencyController state             | 0: Stable, 1: Working, -1: TPS Limited |
 | `balter_{scenario}_erc_state`    | ErrorRateController state               | 0: Stable, 1: SmallStep, 2: BigStep   |
 |                                  |                                         |                                       |
 |                                  |                                         |                                       |

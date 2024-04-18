@@ -76,7 +76,7 @@ where
                         // TODO: Given these metric recordings aren't on the hot-path it is likely
                         // okay that we allocate for them. But if there is a simple way to avoid it
                         // that would be preferable.
-                        metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(1);
+                        metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(0);
                     }
                     true
                 }
@@ -91,7 +91,7 @@ where
                     self.set_goal_tps_unchecked(max_tps);
 
                     if cfg!(feature = "metrics") {
-                        metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(2);
+                        metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(-1);
                     }
                     false
                 }
@@ -99,7 +99,7 @@ where
                     self.set_concurrency(concurrency);
 
                     if cfg!(feature = "metrics") {
-                        metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(0);
+                        metrics::gauge!(format!("{}_cc_state", &self.base_label)).set(1);
                     }
                     false
                 }
@@ -115,14 +115,6 @@ where
         self.sampler.tps_limit
     }
 
-    pub fn set_goal_tps(&mut self, goal_tps: NonZeroU32) {
-        if self.tps_limited && goal_tps > self.sampler.tps_limit {
-            trace!("Unable to set TPS; TPS is limited");
-        } else {
-            self.set_goal_tps_unchecked(goal_tps);
-        }
-    }
-
     pub async fn wait_for_shutdown(self) -> OutputStats {
         let stats = OutputStats {
             goal_tps: self.goal_tps(),
@@ -134,13 +126,11 @@ where
         stats
     }
 
-    fn set_concurrency(&mut self, concurrency: usize) {
-        self.needs_clear = true;
-        trace!("Setting concurrency to: {concurrency}");
-        self.sampler.set_concurrency(concurrency);
-
-        if cfg!(feature = "metrics") {
-            metrics::gauge!(format!("{}_concurrency", &self.base_label)).set(concurrency as f64);
+    pub fn set_goal_tps(&mut self, goal_tps: NonZeroU32) {
+        if self.tps_limited && goal_tps > self.sampler.tps_limit {
+            trace!("Unable to set TPS; TPS is limited");
+        } else {
+            self.set_goal_tps_unchecked(goal_tps);
         }
     }
 
@@ -153,6 +143,16 @@ where
             if cfg!(feature = "metrics") {
                 self.goal_tps_metric(goal_tps);
             }
+        }
+    }
+
+    fn set_concurrency(&mut self, concurrency: usize) {
+        self.needs_clear = true;
+        trace!("Setting concurrency to: {concurrency}");
+        self.sampler.set_concurrency(concurrency);
+
+        if cfg!(feature = "metrics") {
+            metrics::gauge!(format!("{}_concurrency", &self.base_label)).set(concurrency as f64);
         }
     }
 
@@ -235,12 +235,14 @@ where
         };
 
         // TODO: We should adjust interval timing based on noise not just sample count.
-        if data.total() > 2_000 {
+        /*
+        if data.total() > 50_000 {
             let new_interval = self.interval.period() / 2;
             self.interval = interval(new_interval);
             // NOTE: First tick() is always instant
             self.interval.tick().await;
         }
+        */
 
         samples.push(data);
     }
@@ -289,7 +291,6 @@ where
                     latency: self.latency.clone(),
                 };
 
-                trace!("Spawning a new task with id {id}.");
                 self.tasks.push(tokio::spawn(TRANSACTION_HOOK.scope(
                     transaction_data,
                     async move {

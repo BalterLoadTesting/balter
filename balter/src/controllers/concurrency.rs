@@ -49,7 +49,6 @@ impl ConcurrencyController {
     }
 
     pub fn analyze(&mut self, samples: &SampleSet) -> CCOutcome {
-        // TODO: Properly handle this error rather than panic
         let mean_tps = samples.mean_tps();
         let measurement = Measurement {
             concurrency: self.concurrency,

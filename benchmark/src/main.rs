@@ -9,7 +9,7 @@ use tracing_subscriber::FmtSubscriber;
 #[tokio::main]
 async fn main() {
     FmtSubscriber::builder()
-        .with_env_filter("balter=debug")
+        .with_env_filter("balter=trace")
         .init();
 
     PrometheusBuilder::new()
@@ -17,10 +17,12 @@ async fn main() {
         .install()
         .unwrap();
 
-    scenario_a()
-        .saturate()
+    let stats = scenario_a()
+        .tps(50_000)
         .duration(Duration::from_secs(600))
         .await;
+
+    println!("{stats:?}");
 }
 
 #[scenario]
