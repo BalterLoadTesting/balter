@@ -1,0 +1,15 @@
+---
+source: balter-core/src/config.rs
+assertion_line: 91
+expression: "ScenarioConfig {\n    name: \"test_scenario\".to_string(),\n    duration: Some(Duration::from_secs(300)),\n    max_tps: Some(NonZeroU32::new(2_000).unwrap()),\n    error_rate: Some(0.03),\n    latency: Some(LatencyConfig::new(Duration::from_millis(20), 0.99)),\n}"
+---
+{
+  "name": "test_scenario",
+  "duration": 300.0,
+  "max_tps": 2000,
+  "error_rate": 0.03,
+  "latency": {
+    "latency": 0.02,
+    "quantile": 0.99
+  }
+}

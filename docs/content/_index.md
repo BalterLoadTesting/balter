@@ -131,6 +131,22 @@ tokio::join! {
 
 Of course, you aren't limited to just running Balter Scenarios. For example, you can make API calls to disable certain services while a load test is running. The possibilities are endless! Balter aims to provide the minimal abstraction overhead to answer all high-load questions about your service.
 
+# Native Metrics
+
+Metrics are an important part of understanding load performance, and Balter natively supports metrics via the [`metrics` crate](https://github.com/metrics-rs/metrics). This means you can plug in any adapter you need to output metrics in a way that integrates with your system. For instance, Prometheus integration is as easy as adding the following:
+
+```rust
+PrometheusBuilder::new()
+    .with_http_listener("0.0.0.0:8002".parse::<SocketAddr>()?)
+    .install()?;
+```
+
+The metrics output by Balter include statistical information on TPS, latency, error-rates as well as information on the inner workings of Balter (such as the concurrency and controller states).
+
+{{ resize_image(path="/static/balter-metrics-demo-1.png", width=5000, height=5000, op="fit") }}
+
+See [the guide](@/guide/_index.md#metrics) for more information.
+
 # Distributed Runtime
 
 Balter provides a distributed runtime if your load testing requirements are higher than what a single machine can handle. This runtime is currently in an experimental state, though stabilization is a high priority for the near future. Complete documentation can be found in [the guide](@/guide/_index.md#distributed-runtime-experimental).
@@ -149,23 +165,6 @@ async fn main() -> Result<()> {
 ```
 
 In the background, the Balter runtime will start gossiping with peers and sharing work. In order to kick off a Scenario, you simply send an HTTP request to any Balter server, and everything else will be handled automatically. [The guide](@/guide/_index.md#distributed-runtime-experimental) covers more information on the distributed runtime, and the caveats that currently exist.
-
-
-# Native Metrics
-
-Metrics are an important part of understanding load performance, and Balter natively supports metrics via the [`metrics` crate](https://github.com/metrics-rs/metrics). This means you can plug in any adapter you need to output metrics in a way that integrates with your system. For instance, Prometheus integration is as easy as adding the following:
-
-```rust
-PrometheusBuilder::new()
-    .with_http_listener("0.0.0.0:8002".parse::<SocketAddr>()?)
-    .install()?;
-```
-
-The metrics output by Balter include statistical information on TPS, latency, error-rates as well as information on the inner workings of Balter (such as the concurrency and controller states).
-
-{{ resize_image(path="/static/balter-metrics-demo-1.png", width=5000, height=5000, op="fit") }}
-
-See [the guide](@/guide/_index.md#metrics) for more information.
 
 # Support
 

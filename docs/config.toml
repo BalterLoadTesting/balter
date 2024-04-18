@@ -22,7 +22,7 @@ juice_logo_path = "logo.svg"
 juice_extra_menu = [
     { title = "Blog", link = "/blog"},
     { title = "Guide", link = "/guide"},
-    { title = "Docs", link = "https://docs.rs/balter/0.4.0/balter/"},
+    { title = "Docs", link = "https://docs.rs/balter/0.5.0/balter/"},
     { title = "Crates.io", link = "https://crates.io/crates/balter"},
     { title = "Github", link = "https://github.com/BalterLoadTesting/balter"},
 ]

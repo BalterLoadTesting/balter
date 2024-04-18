@@ -191,6 +191,100 @@ async fn call_api(client: &Client) -> Result<(), Error> {
     }
 }
 ```
+# Metrics
+
+Balter has a default feature to emit metrics via the [`metrics` crate](https://github.com/metrics-rs/metrics). This makes Balter metrics agnostic to your metrics system. Please see the `metrics` crate for more information. An example of a metrics adapter for Prometheus:
+
+```rust
+PrometheusBuilder::new()
+    .with_http_listener("0.0.0.0:8002".parse::<SocketAddr>()?)
+    .install()?;
+```
+
+The list of metrics is as follows:
+
+- `{transaction}` => Function name for the `#[transaction]`
+- `{scenario}` => Function name for the `#[scenario]`
+
+| Metric Name                      | Purpose                                 | Values                                |
+|----------------------------------|-----------------------------------------|---------------------------------------|
+| Basic Metrics:                   |                                         |                                       |
+| `{transaction}_success`          | Transactions which are successful       | Integer (counter)                     |
+| `{transaction}_error`            | Transactions which are errors           | Integer (counter)                     |
+| `{transaction}_latency`          | Latency per transaction                 | Seconds (histogram)                   |
+|                                  |                                         |                                       |
+| Basic Internals Metrics:         |                                         |                                       |
+| `balter_{scenario}_concurrency`  | Number of concurrent tasks per Scenario | Integer                               |
+| `balter_{scenario}_goal_tps`     | Set-point for TPS                       | Integer                               |
+|                                  |                                         |                                       |
+| Advanced Internals Metrics:      |                                         |                                       |
+| `balter_{scenario}_lc_goal_tps`  | Set-point for TPS (LatencyController)   | Integer                               |
+| `balter_{scenario}_erc_goal_tps` | Set-point for TPS (ErrorRateController) | Integer                               |
+| `balter_{scenario}_cc_state`     | ConcurrencyController state             | 0: Stable, 1: Working, 2: TPS Limited |
+| `balter_{scenario}_erc_state`    | ErrorRateController state               | 0: Stable, 1: SmallStep, 2: BigStep   |
+|                                  |                                         |                                       |
+|                                  |                                         |                                       |
+|                                  |                                         |                                       |
+|                                  |                                         |                                       |
+|                                  |                                         |                                       |
+
+
+{{ resize_image(path="/static/balter-metrics-demo-1.png", width=5000, height=5000, op="fit") }}
+
+# Distributed Runtime (Experimental)
+
+Running a load test on a single server is limited, and Balter aims to provide a distributed runtime. Currently Balter supports distributed load tests, but they are fragile and not efficient. This functionality will improve over time, but the current support should be considered experimental.
+
+To use the distributed runtime, you need to set the `rt` feature flag. You will also need to add `linkme` to your dependencies list.
+
+```toml
+[dependencies]
+balter = { version = "0.3", features = ["rt"] }
+linkme = "0.3"
+```
+
+The next step is to instantiate the runtime. This is needed in order to set up the server and gossip functionality.
+
+```rust,no_run
+use balter::prelude::*;
+
+#[tokio::main]
+async fn main() {
+    BalterRuntime::new().with_args().run().await;
+}
+```
+
+Note that we call `.with_args()` on the runtime. This sets up the binary to accept CLI arguments for the port (`-p`) and for peer addresses (`-n`). You can also use the builder pattern with `.port()` and `.peers()`, which are documented in the rustdocs. In order to have distributed load testing support, each instantiation of the service needs to know of the address of at least one peer, otherwise the gossip functionality won't work. Support will be added for DNS support to allow for more dynamic addresses. With the runtime configured, you can spin up the servers.
+
+Assuming the first server is running on `127.0.0.1:7621` (the first server does not need any peer addresses), each subsequent service can be started like so:
+
+```bash
+$ ./load_test_binary -n 127.0.0.1:7621
+```
+
+Once the services are all pointed at each other, they will begin to gossip and coordinate. To start a load test, you make an HTTP request to the `/run` endpoint of *any* of the services in the mesh with the name being the function name of the scenario you would like to run.
+
+The data-structure is as follows (using `?` to denote optional fields):
+
+```json
+{
+    "name": "{scenario_name}",
+    "duration?": "float", // Duration in seconds
+    "max_tps?": "integer",
+    "error_rate?": "float", // Between 0. and 1.
+    "latency?": {
+        "latency": "float", // Latency in seconds
+        "quantile": "float", // Between 0. and 1. (eg. p95 = .95)
+    }
+}
+```
+An example running against a server:
+
+```bash
+$ # For running a TPS load test
+$ curl "127.0.0.1:7621/run" \
+    --json '{ "name": "my_scenario", "duration": 30, "max_tps": 10000, "error_rate": 0.05, "latency": { "latency": "0.02", "quantile": 0.95 } }'
+```
 
 # Patterns
 
@@ -255,47 +349,3 @@ tokio::join! {
     },
 }
 ```
-
-
-# Distributed Runtime (Experimental)
-
-Running a load test on a single server is limited, and Balter aims to provide a distributed runtime. Currently Balter supports distributed load tests, but they are fragile and not efficient. This functionality will improve over time, but the current support should be considered experimental.
-
-To use the distributed runtime, you need to set the `rt` feature flag. You will also need to add `linkme` to your dependencies list.
-
-```toml
-[dependencies]
-balter = { version = "0.3", features = ["rt"] }
-linkme = "0.3"
-```
-
-The next step is to instantiate the runtime. This is needed in order to set up the server and gossip functionality.
-
-```rust,no_run
-use balter::prelude::*;
-
-#[tokio::main]
-async fn main() {
-    BalterRuntime::new().with_args().run().await;
-}
-```
-
-Note that we call `.with_args()` on the runtime. This sets up the binary to accept CLI arguments for the port (`-p`) and for peer addresses (`-n`). You can also use the builder pattern with `.port()` and `.peers()`, which are documented in the rustdocs. In order to have distributed load testing support, each instantiation of the service needs to know of the address of at least one peer, otherwise the gossip functionality won't work. Support will be added for DNS support to allow for more dynamic addresses. With the runtime configured, you can spin up the servers.
-
-Assuming the first server is running on `127.0.0.1:7621` (the first server does not need any peer addresses), each subsequent service can be started like so:
-
-```bash
-$ ./load_test_binary -n 127.0.0.1:7621
-```
-
-Once the services are all pointed at each other, they will begin to gossip and coordinate. To start a load test, you make an HTTP request to the `/run` endpoint of *any* of the services in the mesh with the name being the function name of the scenario you would like to run. Currently you must specify all parameters, and `.saturate()`, `overload()` and `error_rate()` are all under one header (`Saturate`).
-
-```bash
-$ # For running a TPS load test
-$ curl "127.0.0.1:7621/run" --json '{ "name": "my_scenario", "duration": 30, "kind": { "Tps": 500 }}'
-
-$ # For running a saturate/overload/error_rate load test (`.saturate()` is 0.03, `.overload()` is 0.80)
-$ curl "127.0.0.1:7621/run" --json '{ "name": "my_scenario", "duration": 30, "kind": { "Saturate": 0.03 }}'
-```
-
-# Metrics

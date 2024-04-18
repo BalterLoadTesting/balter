@@ -3,7 +3,7 @@ use crate::BASELINE_TPS;
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 #[cfg(feature = "rt")]
-use serde_with::{serde_as, DurationSeconds};
+use serde_with::{serde_as, DurationSecondsWithFrac};
 use std::num::NonZeroU32;
 use std::time::Duration;
 
@@ -14,11 +14,11 @@ use std::time::Duration;
 #[cfg_attr(feature = "rt", derive(Serialize, Deserialize))]
 pub struct ScenarioConfig {
     pub name: String,
-    #[cfg_attr(feature = "rt", serde_as(as = "Option<DurationSeconds>"))]
+    #[cfg_attr(feature = "rt", serde_as(as = "Option<DurationSecondsWithFrac>"))]
     pub duration: Option<Duration>,
     pub max_tps: Option<NonZeroU32>,
     pub error_rate: Option<f64>,
-    pub latency: Option<(Duration, f64)>,
+    pub latency: Option<LatencyConfig>,
 }
 
 impl ScenarioConfig {
@@ -63,5 +63,37 @@ impl ScenarioConfig {
     #[allow(unused)]
     pub fn set_max_tps(&mut self, max_tps: NonZeroU32) {
         self.max_tps = Some(max_tps);
+    }
+}
+
+#[doc(hidden)]
+#[derive(Clone, Debug, Copy)]
+#[cfg_attr(feature = "rt", cfg_eval::cfg_eval, serde_as)]
+#[cfg_attr(feature = "rt", derive(Serialize, Deserialize))]
+pub struct LatencyConfig {
+    #[cfg_attr(feature = "rt", serde_as(as = "DurationSecondsWithFrac"))]
+    pub latency: Duration,
+    pub quantile: f64,
+}
+
+impl LatencyConfig {
+    pub fn new(latency: Duration, quantile: f64) -> Self {
+        Self { latency, quantile }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scenario_config_serialization() {
+        insta::assert_json_snapshot!(ScenarioConfig {
+            name: "test_scenario".to_string(),
+            duration: Some(Duration::from_secs(300)),
+            max_tps: Some(NonZeroU32::new(2_000).unwrap()),
+            error_rate: Some(0.03),
+            latency: Some(LatencyConfig::new(Duration::from_millis(20), 0.99)),
+        });
     }
 }

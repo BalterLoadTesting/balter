@@ -1,6 +1,6 @@
 //! Scenario logic and constants
 use crate::controllers::{CompositeController, Controller};
-use balter_core::{RunStatistics, ScenarioConfig};
+use balter_core::{LatencyConfig, RunStatistics, ScenarioConfig};
 #[cfg(feature = "rt")]
 use balter_runtime::runtime::{RuntimeMessage, BALTER_OUT};
 use std::{
@@ -163,7 +163,7 @@ where
             panic!("Specified quantile must be between 0 and 1. Value provided was {quantile}.");
         }
 
-        self.config.latency = Some((latency, quantile));
+        self.config.latency = Some(LatencyConfig::new(latency, quantile));
         self
     }
 
