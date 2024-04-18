@@ -349,3 +349,16 @@ tokio::join! {
     },
 }
 ```
+
+# Debugging
+
+## TPS Limited
+
+One of the warning messages you might see from Balter is `"Unable to achieve TPS on current server."` What this means is that Balter has detected it has maxed out on the TPS it is able to output for the given Scenario. This can be the case for a few reasons, and this section will cover how Balter detects this and ways to diagnose what might be going wrong.
+
+The way Balter works under-the-hood is by increasing concurrency for a given Scenario in order to increase the TPS. However, in the case of an external bottleneck, increasing concurrency might not lead to an increase in TPS -- in fact, it might lead to a decrease as contention is increased. For instance, if you set a Scenario to run with `.tps(10_000)`, but the network card is bottlenecked at 5,000 TPS, you don't want to indefinitely increase concurrent tasks.
+
+To detect situations where the TPS is limited, Balter keeps track of pairs of `(concurrency, measured_tps)` as it scales up. It then runs a simple slope comparison algorithm to determine if an increase in concurrency has not increased the `measured_tps`, at which point we know there is a bottleneck.
+
+The metrics provided by Balter can give insight into where the bottleneck might be. The success/error, latency and concurrency measurements are going to be the most useful. You can also use the distributed runtime feature of Balter in order to scale out to additional servers.
+
