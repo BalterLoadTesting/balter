@@ -1,0 +1,15 @@
+{% extends "juice/templates/page.html" %}
+
+{% block header %}
+<header class="box-shadow">
+    {{ macros::render_header() }}
+</header>
+{% endblock header %}
+
+{% block content %}
+<div style="display: flex; flex-direction: row; align-items: center">
+<div class="heading-text">{{ page.title }}</div>
+<h2 style="margin-left: 2em" class="subtext">{{page.authors.0}}, {{page.date}}</h2>
+</div>
+{{ page.content | safe }}
+{% endblock content %}

@@ -1,9 +1,8 @@
 +++
 title = "Balter v0.5.0"
 date = "2024-04-12"
+authors = ["Byron Wasti"]
 +++
-
-# Balter v0.5.0
 
 The release of Balter v0.5.0 comes with major core refactors and a major feature which rounds out the basic functionality for single-server operation.
 

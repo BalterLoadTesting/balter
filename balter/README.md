@@ -40,6 +40,6 @@ async fn my_transaction() -> Result<u32, String> {
 
 ## Developer Notes
 
-The Balter repository is set up to be easy to get started with development. It uses Nix to facilitate the environment setup via `shell.nix` (if you haven't yet drank the Nixaide, open up that file and it will give you an idea of the programs you'll want).
+The Balter repository is set up to be easy to get started with development. It uses Nix to facilitate the environment setup via `shell.nix` (if you haven't yet drank the Nixaide, open up that file and it will give you an idea of the programs you'll want). Otherwise, Balter works just fine with all the default `cargo` commands.
 
-To run the integration tests, use `just integration` (or if you don't have `just` installed, `cargo test --release --features integration`). In order to easily debug these tests (which oftentimes rely on controller logic operating correctly), it can be useful to have graphs. You can find Grafana dashboards for each test in `dashboards/`, and if you have Prometheus running (using the `prometheus.yml` at the root) and Grafana running (importing the dashboards) you should be set.
+The integration tests can be a bit finicky. To run the integration tests, use `just integration` (or if you don't have `just` installed, `cargo test --release --features integration`). In order to easily debug these tests (which oftentimes rely on controller logic operating correctly), it can be useful to have graphs. You can find Grafana dashboards for each test in `dashboards/`, and if you have Prometheus running (using the `prometheus.yml` at the root) and Grafana running (importing the dashboards) you should be set.
