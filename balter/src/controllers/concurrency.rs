@@ -7,6 +7,14 @@ use tracing::{debug, error, trace};
 const STARTING_CONCURRENCY_COUNT: usize = 4;
 const MAX_CHANGE: usize = 100;
 
+// NOTE: Somewhat tricky to explain, but essentially our optimal concurrency search algorithm only
+// increases concurrency. This means if we set concurrency to an "optimal" value, the search algo
+// will immediately start increasing it (leading to a negative feedback loop with increased
+// contention). This adjustment is a bit of a hack, where we always allow the concurrency to grow
+// so that the algorithm stabilizes.
+// TODO: Rewrite the concurrency search algorithm (see above NOTE)
+const CONCURRENCY_SET_ADJUSTMENT: f64 = 0.75;
+
 #[derive(Debug)]
 pub(crate) struct ConcurrencyController {
     prev_measurements: Vec<Measurement>,
@@ -29,8 +37,8 @@ impl ConcurrencyController {
         } else {
             // TODO: Better numerical conversions
             let ratio = goal_tps.get() as f64 / self.goal_tps.get() as f64;
-            let new_concurrency =
-                (ratio * self.concurrency as f64 + 1.).max(STARTING_CONCURRENCY_COUNT as f64);
+            let new_concurrency = (ratio * self.concurrency as f64 * CONCURRENCY_SET_ADJUSTMENT)
+                .max(STARTING_CONCURRENCY_COUNT as f64);
             new_concurrency as usize
         };
 
@@ -97,6 +105,7 @@ impl ConcurrencyController {
                 self.concurrency = STARTING_CONCURRENCY_COUNT;
                 CCOutcome::AlterConcurrency(self.concurrency)
             } else if let Some((max_tps, concurrency)) = self.detect_underpowered() {
+                let concurrency = (concurrency as f64 * CONCURRENCY_SET_ADJUSTMENT) as usize;
                 self.concurrency = concurrency;
                 CCOutcome::TpsLimited(max_tps, concurrency)
             } else {
@@ -119,6 +128,7 @@ impl ConcurrencyController {
                 // NOTE: The controller can get stuck at a given concurrency, and results in NaN.
                 // This is an edge-case of when the controller is limited.
                 if slope.is_nan() {
+                    debug!("NaN Slope detected. Ignoring.");
                     return 0.;
                 }
 
