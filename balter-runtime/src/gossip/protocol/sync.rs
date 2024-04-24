@@ -6,20 +6,18 @@ use uuid::Uuid;
 impl Gossip {
     pub(crate) async fn request_sync(
         &self,
-        mut stream: impl GossipStream,
+        stream: &mut impl GossipStream,
         peer_addr: SocketAddr,
     ) -> Result<(), GossipError> {
         stream.send(Message::sync()).await?;
 
-        let hash = { self.data.lock()?.hash() };
+        let hash = self.data.lock()?.hash();
         stream
             .send(Message::syn(&self.server_id, hash, peer_addr))
             .await?;
 
         let msg: Message<Ack> = stream.recv().await?;
-        {
-            self.data.lock()?.learn_address(msg.addr());
-        }
+        self.data.lock()?.learn_address(msg.addr());
         if msg.hash() == hash {
             stream.send(Message::fin()).await?;
             return Ok(());
@@ -48,7 +46,7 @@ impl Gossip {
 
     pub(crate) async fn receive_sync_request(
         &self,
-        mut stream: impl GossipStream,
+        stream: &mut impl GossipStream,
         peer_addr: SocketAddr,
     ) -> Result<(), GossipError> {
         let msg: Message<Syn> = stream.recv().await?;
@@ -58,7 +56,7 @@ impl Gossip {
             data.hash()
         };
 
-        // NOTE: We want to send an Ack so the other serve can learn our ID
+        // NOTE: We want to send an Ack so the other server can learn our ID
         stream
             .send(Message::ack(&self.server_id, hash, peer_addr))
             .await?;

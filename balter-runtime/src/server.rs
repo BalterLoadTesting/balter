@@ -85,7 +85,7 @@ async fn run(
 ) -> Result<String, HandlerError> {
     let output = format!("Running scenario {}", &scenario.name);
 
-    spawn_scenario(scenario).await?;
+    spawn_scenario(scenario)?;
 
     Ok(output)
 }
@@ -98,8 +98,8 @@ async fn ws(
     ws.on_upgrade(move |socket| handle_ws(socket, state, connection_info.0))
 }
 
-async fn handle_ws(socket: WebSocket, state: Arc<ServerState>, addr: SocketAddr) {
-    let res = state.gossip.receive_request(socket, addr).await;
+async fn handle_ws(mut socket: WebSocket, state: Arc<ServerState>, addr: SocketAddr) {
+    let res = state.gossip.receive_request(&mut socket, addr).await;
     if let Err(err) = res {
         error!("Error in gossip protocol: {err:?}");
     }

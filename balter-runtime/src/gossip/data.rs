@@ -94,6 +94,14 @@ impl GossipData {
             error!("Unable to modify state.");
         }
     }
+
+    pub fn is_busy(&self) -> Option<bool> {
+        match self.peers.get(&self.server_id) {
+            Some(info) if info.state == PeerState::Busy => Some(true),
+            Some(_info) => Some(false),
+            None => None,
+        }
+    }
 }
 
 #[derive(Hash, PartialEq, Eq, Debug, Copy, Clone, Serialize, Deserialize)]

@@ -18,6 +18,7 @@ mkShell rec {
       openssl
       pkg-config
       prometheus
+      grafana
     ];
 
     RUSTC_VERSION = pkgs.lib.readFile ./rust-toolchain.toml;

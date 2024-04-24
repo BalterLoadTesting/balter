@@ -6,6 +6,12 @@ pub(crate) struct Message<M> {
     pub(crate) inner: M,
 }
 
+impl<M> Message<M> {
+    pub fn new(inner: M) -> Self {
+        Self { inner }
+    }
+}
+
 impl<M: Serialize> Message<M> {
     pub fn to_bytes(&self) -> Result<Vec<u8>, GossipError> {
         Ok(bincode::serialize(self)?)

@@ -18,8 +18,7 @@ async fn main() {
         .unwrap();
 
     let stats = scenario_a()
-        .tps(50_000)
-        .duration(Duration::from_secs(600))
+        .tps(70_000)
         .await;
 
     println!("{stats:?}");
@@ -27,11 +26,13 @@ async fn main() {
 
 #[scenario]
 async fn scenario_a() {
-    let _ = transaction_a().await;
+    loop {
+        let _ = transaction_a().await;
+    }
 }
 
 #[transaction]
 async fn transaction_a() -> Result<(), ()> {
-    sleep(Duration::from_nanos(1)).await;
+    sleep(Duration::from_millis(10)).await;
     black_box(Ok(()))
 }

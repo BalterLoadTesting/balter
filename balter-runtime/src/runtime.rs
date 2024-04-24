@@ -119,7 +119,7 @@ impl BalterRuntime {
 
     #[instrument(name="balter", skip_all, fields(port=self.port))]
     pub async fn run(self) {
-        let gossip = Gossip::new(uuid::Uuid::new_v4(), self.port);
+        let gossip = Gossip::new(uuid::Uuid::new_v4(), self.port, spawn_scenario);
 
         spawn_or_halt(server_task(self.port, gossip.clone())).await;
         spawn_or_halt(gossip_task(gossip.clone())).await;
@@ -127,7 +127,7 @@ impl BalterRuntime {
     }
 }
 
-pub(crate) async fn spawn_scenario(config: ScenarioConfig) -> Result<(), RuntimeError> {
+pub(crate) fn spawn_scenario(config: ScenarioConfig) -> Result<(), RuntimeError> {
     // TODO: We probably don't want to rebuild this every time.
     let scenarios: HashMap<_, _> = BALTER_SCENARIOS
         .iter()
@@ -164,8 +164,8 @@ async fn helper_task(gossip: Gossip) -> Result<(), RuntimeError> {
                         data.select_free_peer()
                     };
                     if let Some(peer) = peer {
-                        let stream = peer_stream(&peer).await?;
-                        let res = gossip.request_help(stream, peer.addr, config).await;
+                        let mut stream = peer_stream(&peer).await?;
+                        let res = gossip.request_help(&mut stream, peer.addr, config).await;
                         if let Err(error) = res {
                             error!("Error in gossip protocol: {error:?}");
                         }

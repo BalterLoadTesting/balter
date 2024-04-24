@@ -23,6 +23,9 @@ pub enum GossipError {
 
     #[error("Error in parsing URL. This is a bug in Balter. {0}")]
     UrlError(#[from] url::ParseError),
+
+    #[error("Peer to share work with is busy. Retries not implemented yet.")]
+    PeerBusy,
 }
 
 impl<T> From<PoisonError<T>> for GossipError {

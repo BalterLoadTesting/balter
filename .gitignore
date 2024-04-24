@@ -8,3 +8,5 @@ flamegraph.svg
 perf.data*
 prometheus.yml
 /docs/public
+/config
+/scripts
