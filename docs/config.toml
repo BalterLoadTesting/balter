@@ -1,5 +1,5 @@
 # The URL the site will be built for
-base_url = "https://www.balterloadtesting.com"
+base_url = "https://www.balterloadtesting.com/balter"
 
 title = "Balter Load Testing"
 
@@ -17,11 +17,11 @@ theme = "juice"
 highlight_code = true
 
 [extra]
-juice_logo_name = "Balter"
+juice_logo_name = "Balter Load Testing"
 juice_logo_path = "logo.svg"
 juice_extra_menu = [
-    { title = "Blog", link = "/blog"},
-    { title = "Guide", link = "/guide"},
+    { title = "Blog", link = "https://www.balterloadtesting.com/balter/blog"},
+    { title = "Guide", link = "https://www.balterloadtesting.com/balter/guide"},
     { title = "Docs", link = "https://docs.rs/balter/0.5.0/balter/"},
     { title = "Crates.io", link = "https://crates.io/crates/balter"},
     { title = "Github", link = "https://github.com/BalterLoadTesting/balter"},
