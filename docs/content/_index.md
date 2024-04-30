@@ -18,13 +18,11 @@ Balter is a new project and still has some rough edges. The project is being wor
 
 # How It Works
 
-The two abstractions Balter provides are the *Scenario* and the *Transaction*. A Scenario is some characteristic load you want to run, such as an average user work-flow, and it must call one or more Transactions (directly or indirectly). The Scenario is the test, and the Transaction is how Balter keeps track of whats going on.
-
-To perform a load test, Balter creates many instances of a Scenario and runs them in parallel. It then keeps track of statistical information around the Transactions, and is able to rate-limit outgoing transactions, increase concurrency, distribute the work to other machines, etc.
-
-Both a Scenario and a Transaction in Balter are async functions with an attribute on them, `#[scenario]` and `#[transaction]` respectively. See [the guide](@/guide/_index.md) for type constraints that are currently required. An example of a Scenario which calls two Transactions is below:
+Balter is a framework for writing load tests with regular Rust code. Balter introduces two macros, `#[scenario]` and `#[transaction]` which compose together to make load test scenarios:
 
 ```rust
+use balter::prelude::*;
+
 #[scenario]
 async fn test_scaling_functionality() {
     let client = reqwest::Client::new();
@@ -54,7 +52,7 @@ async fn bar_transaction(client: &Client) -> Result<()> {
 }
 ```
 
-A Scenario supercharges a Rust function with additional methods related to load testing. The simplest to understand is the `.tps()` method, which will run the function in parallel and constrain the rate of transactions such that the transactions per second (TPS) is equal to the value you set:
+A Scenario supercharges a Rust function with additional methods related to load testing. For instance, the `.tps()` method will run the function in parallel and constrain the rate of transactions such that the transactions per second (TPS) is equal to the value you set:
 ```rust
 test_scaling_functionality()
     .tps(10_000)
