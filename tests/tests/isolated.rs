@@ -5,8 +5,8 @@ use utils::*;
 #[cfg(feature = "integration")]
 mod tests {
     use super::*;
-
     use balter::prelude::*;
+    use mock_service::prelude::*;
     use reqwest::Client;
     use std::sync::OnceLock;
     use std::time::Duration;
@@ -22,12 +22,76 @@ mod tests {
 
         let stats = scenario_1ms_delay()
             .tps(10_000)
-            .duration(Duration::from_secs(30))
+            .duration(Duration::from_secs(360))
             .await;
 
         assert_eq!(stats.goal_tps, 10_000);
         assert!(stats.actual_tps > 9_500.);
         assert!(stats.concurrency >= 10);
+    }
+
+    #[scenario]
+    async fn scenario_1ms_delay() {
+        let client = Client::new();
+        loop {
+            let _ = transaction_1ms(&client).await;
+        }
+    }
+
+    #[transaction]
+    async fn transaction_1ms(client: &Client) -> Result<(), reqwest::Error> {
+        let _res = client
+            .get("http://0.0.0.0:3002/")
+            .json(&Config {
+                scenario_name: "tps_isolated".to_string(),
+                tps: None,
+                latency: Some(LatencyConfig {
+                    latency: Duration::from_millis(1),
+                    kind: LatencyKind::Delay,
+                }),
+            })
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn single_instance_noisy_tps() {
+        init().await;
+
+        let stats = scenario_1ms_noisy_delay()
+            .tps(50)
+            .duration(Duration::from_secs(80))
+            .await;
+
+        assert_eq!(stats.goal_tps, 50);
+        assert!(stats.actual_tps > 45.);
+        assert!(stats.concurrency >= 10);
+    }
+
+    #[scenario]
+    async fn scenario_1ms_noisy_delay() {
+        let client = Client::new();
+        loop {
+            let _ = transaction_noisy_1ms(&client).await;
+        }
+    }
+
+    #[transaction]
+    async fn transaction_noisy_1ms(client: &Client) -> Result<(), reqwest::Error> {
+        let _res = client
+            .get("http://0.0.0.0:3002/")
+            .json(&Config {
+                scenario_name: "tps_isolated".to_string(),
+                tps: None,
+                latency: Some(LatencyConfig {
+                    latency: Duration::from_millis(400),
+                    kind: LatencyKind::Noise(Duration::from_millis(300), 50.),
+                }),
+            })
+            .send()
+            .await?;
+        Ok(())
     }
 
     #[tokio::test]
@@ -63,18 +127,6 @@ mod tests {
     /* Scenario Helpers */
 
     static CLIENT: OnceLock<Client> = OnceLock::new();
-
-    #[scenario]
-    async fn scenario_1ms_delay() {
-        let _ = transaction_1ms().await;
-    }
-
-    #[transaction]
-    async fn transaction_1ms() -> Result<(), reqwest::Error> {
-        let client = CLIENT.get_or_init(Client::new);
-        client.get("http://0.0.0.0:3002/delay/ms/1").send().await?;
-        Ok(())
-    }
 
     #[scenario]
     async fn scenario_1ms_limited_7000() {

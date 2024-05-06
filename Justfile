@@ -14,4 +14,4 @@ publish EXECUTE='':
     cargo release --exclude balter-tests --exclude mock-service --exclude examples {{EXECUTE}}
 
 integration TEST='':
-    cargo test --release --features integration {{TEST}} -- --nocapture --test-threads 1
+    cargo test --release --features integration {{TEST}} -- --nocapture

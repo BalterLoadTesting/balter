@@ -18,3 +18,5 @@ tracing = "0.1.40"
 serde = { version = "1.0.197", features = ["derive"] }
 tower-http = { version="0.5.2", features = ["trace"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+rand_distr = "0.4.3"
+rand = "0.8.5"

@@ -9,6 +9,7 @@ use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use lazy_static::lazy_static;
 #[allow(unused)]
 use metrics::{counter, gauge, histogram};
+use rand_distr::{Distribution, SkewNormal};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -77,6 +78,7 @@ pub struct LatencyConfig {
 pub enum LatencyKind {
     Delay,
     Linear(NonZeroU32),
+    Noise(Duration, f64),
     //Exponential(NonZeroU32),
     //Cutoff(NonZeroU32),
 }
@@ -144,6 +146,16 @@ pub async fn mock_route(Json(config): Json<Config>) -> Result<(), StatusCode> {
         match latency_conf.kind {
             LatencyKind::Delay => {
                 tokio::time::sleep(latency_conf.latency).await;
+                histogram!(format!("mock-server.{}.latency", &config.scenario_name))
+                    .record(latency_conf.latency.as_secs_f64());
+            }
+            LatencyKind::Noise(std, shape) => {
+                let skew_normal =
+                    SkewNormal::new(latency_conf.latency.as_secs_f64(), std.as_secs_f64(), shape)
+                        .unwrap();
+                let v: f64 = skew_normal.sample(&mut rand::thread_rng());
+
+                tokio::time::sleep(Duration::from_secs_f64(v)).await;
                 histogram!(format!("mock-server.{}.latency", &config.scenario_name))
                     .record(latency_conf.latency.as_secs_f64());
             }

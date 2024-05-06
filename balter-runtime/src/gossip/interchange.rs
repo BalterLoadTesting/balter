@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::future::Future;
 use tokio::io::{AsyncRead, AsyncWrite};
 
+#[allow(dead_code)]
 #[trait_variant::make(GossipStream: Send)]
 pub trait LocalGossipStream {
     async fn recv_bytes(&mut self) -> Option<Result<Vec<u8>, GossipError>>;
