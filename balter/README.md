@@ -5,8 +5,8 @@
 
 Balter, short for *Balter, A Load TestER*, is a load/stress testing framework designed to be flexible, efficient, and simple to use. Balter aims to minimize the conceptual overhead of load testing, and builds off of Tokio and the async ecosystem.
 
-- See the [Website](https://www.balterloadtesting.com/) for an introduction to Balter.
-- See the [Guide](https://www.balterloadtesting.com/guide) for a guide on how to get started.
+- See the [Website](https://www.balterloadtesting.com/balter) for an introduction to Balter.
+- See the [Guide](https://www.balterloadtesting.com/balter/guide) for a guide on how to get started.
 - See the [Developer Notes](#developer-notes) section for tips on modifying Balter.
 
 # Example Usage
