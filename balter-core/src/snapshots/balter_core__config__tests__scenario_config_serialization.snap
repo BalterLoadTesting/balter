@@ -1,7 +1,7 @@
 ---
 source: balter-core/src/config.rs
-assertion_line: 91
-expression: "ScenarioConfig {\n    name: \"test_scenario\".to_string(),\n    duration: Some(Duration::from_secs(300)),\n    max_tps: Some(NonZeroU32::new(2_000).unwrap()),\n    error_rate: Some(0.03),\n    latency: Some(LatencyConfig::new(Duration::from_millis(20), 0.99)),\n}"
+assertion_line: 113
+expression: "ScenarioConfig {\n    name: \"test_scenario\".to_string(),\n    duration: Some(Duration::from_secs(300)),\n    max_tps: Some(NonZeroU32::new(2_000).unwrap()),\n    error_rate: Some(0.03),\n    latency: Some(LatencyConfig::new(Duration::from_millis(20), 0.99)),\n    hints: HintConfig::default(),\n}"
 ---
 {
   "name": "test_scenario",
@@ -11,5 +11,8 @@ expression: "ScenarioConfig {\n    name: \"test_scenario\".to_string(),\n    dur
   "latency": {
     "latency": 0.02,
     "quantile": 0.99
+  },
+  "hints": {
+    "concurrency": 10
   }
 }

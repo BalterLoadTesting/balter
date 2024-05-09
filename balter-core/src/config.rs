@@ -1,4 +1,4 @@
-use crate::BASELINE_TPS;
+use crate::BASE_TPS;
 #[cfg(feature = "rt")]
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
@@ -19,6 +19,7 @@ pub struct ScenarioConfig {
     pub max_tps: Option<NonZeroU32>,
     pub error_rate: Option<f64>,
     pub latency: Option<LatencyConfig>,
+    pub hints: HintConfig,
 }
 
 impl ScenarioConfig {
@@ -29,6 +30,7 @@ impl ScenarioConfig {
             max_tps: None,
             error_rate: None,
             latency: None,
+            hints: HintConfig::default(),
         }
     }
 
@@ -50,7 +52,7 @@ impl ScenarioConfig {
             }
             | ScenarioConfig {
                 latency: Some(_), ..
-            } => Some(BASELINE_TPS),
+            } => Some(BASE_TPS),
 
             ScenarioConfig {
                 max_tps: Some(tps), ..
@@ -58,6 +60,10 @@ impl ScenarioConfig {
 
             _ => None,
         }
+    }
+
+    pub fn concurrency(&self) -> usize {
+        self.hints.concurrency
     }
 
     #[allow(unused)]
@@ -82,6 +88,22 @@ impl LatencyConfig {
     }
 }
 
+#[doc(hidden)]
+#[derive(Clone, Debug, Copy)]
+#[cfg_attr(feature = "rt", cfg_eval::cfg_eval, serde_as)]
+#[cfg_attr(feature = "rt", derive(Serialize, Deserialize))]
+pub struct HintConfig {
+    pub concurrency: usize,
+}
+
+impl Default for HintConfig {
+    fn default() -> Self {
+        Self {
+            concurrency: crate::BASE_CONCURRENCY,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,6 +116,7 @@ mod tests {
             max_tps: Some(NonZeroU32::new(2_000).unwrap()),
             error_rate: Some(0.03),
             latency: Some(LatencyConfig::new(Duration::from_millis(20), 0.99)),
+            hints: HintConfig::default(),
         });
     }
 }

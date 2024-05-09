@@ -1,5 +1,6 @@
 use crate::controllers::Controller;
-use balter_core::{SampleSet, BASELINE_TPS};
+use crate::data::SampleSet;
+use balter_core::BASE_TPS;
 use std::num::NonZeroU32;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
@@ -18,7 +19,7 @@ impl ErrorRateController {
     pub fn new(name: &str, error_rate: f64) -> Self {
         Self {
             base_label: format!("balter_{name}"),
-            goal_tps: BASELINE_TPS,
+            goal_tps: BASE_TPS,
             error_rate,
             state: State::BigStep,
         }
@@ -43,7 +44,7 @@ impl ErrorRateController {
 
 impl Controller for ErrorRateController {
     fn initial_tps(&self) -> NonZeroU32 {
-        BASELINE_TPS
+        BASE_TPS
     }
 
     fn limit(&mut self, samples: &SampleSet, stable: bool) -> NonZeroU32 {
@@ -95,11 +96,11 @@ impl Controller for ErrorRateController {
                         )
                     }
                     State::SmallStep(step_ratio) => {
-                        trace!("Over bounds w/ SmallStep.");
+                        trace!("Over bounds w/ SmallStep({step_ratio}).");
 
-                        let step = (self.goal_tps.get() as f64 * step_ratio).max(1.);
+                        let rev_goal = (self.goal_tps.get() as f64 / (step_ratio + 1.)).max(1.);
                         (
-                            NonZeroU32::new(self.goal_tps.get() - step as u32).unwrap(),
+                            NonZeroU32::new(rev_goal as u32).unwrap(),
                             State::SmallStep(step_ratio / 2.),
                         )
                     }

@@ -1,5 +1,6 @@
 use crate::controllers::Controller;
-use balter_core::{SampleSet, BASELINE_TPS};
+use crate::data::SampleSet;
+use balter_core::BASE_TPS;
 use std::num::NonZeroU32;
 use std::time::Duration;
 #[allow(unused)]
@@ -21,7 +22,7 @@ impl LatencyController {
             base_label: format!("balter_{name}"),
             latency,
             quantile,
-            goal_tps: BASELINE_TPS,
+            goal_tps: BASE_TPS,
         };
         s.goal_tps_metric();
         s
@@ -36,7 +37,7 @@ impl LatencyController {
 
 impl Controller for LatencyController {
     fn initial_tps(&self) -> NonZeroU32 {
-        BASELINE_TPS
+        BASE_TPS
     }
 
     fn limit(&mut self, samples: &SampleSet, stable: bool) -> NonZeroU32 {

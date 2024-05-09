@@ -10,7 +10,7 @@ Create a new `Cargo` project, and include Balter in your `Cargo.toml`.
 
 ```toml
 [dependencies]
-balter = "0.5"
+balter = "0.6"
 ```
 
 Then, at the top of `main.rs` (or the file you want to use Balter functionality in):

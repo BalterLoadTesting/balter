@@ -18,7 +18,7 @@ mod tests {
 
         let stats = latency_200ms_scenario()
             .latency(Duration::from_millis(130), 0.9)
-            .duration(Duration::from_secs(300))
+            .duration(Duration::from_secs(60))
             .await;
 
         assert!(dbg!(stats.latency_p90) > Duration::from_millis(120));

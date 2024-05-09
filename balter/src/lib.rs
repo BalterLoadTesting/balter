@@ -37,14 +37,19 @@ pub mod scenario;
 #[doc(hidden)]
 pub mod transaction;
 
+mod hints;
+
 #[macro_use]
 #[doc(hidden)]
 pub mod macros;
 
 pub(crate) mod controllers;
+pub(crate) mod data;
+pub(crate) mod sampler;
 
 #[cfg(not(feature = "rt"))]
 pub use balter_macros::{scenario, transaction};
+pub use hints::Hint;
 pub use scenario::Scenario;
 
 cfg_rt! {
