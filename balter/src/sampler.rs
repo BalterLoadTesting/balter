@@ -1,7 +1,7 @@
 use crate::controllers::{CCOutcome, ConcurrencyController};
+use crate::data::{SampleData, SampleSet};
 use crate::transaction::{TransactionData, TRANSACTION_HOOK};
 use arc_swap::ArcSwap;
-use balter_core::{SampleData, SampleSet};
 use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use metrics_util::AtomicBucket;
 use std::future::Future;
@@ -17,6 +17,8 @@ use tokio::task::JoinHandle;
 use tokio::time::{interval, Interval};
 #[allow(unused)]
 use tracing::{debug, error, info, trace, warn};
+
+mod base_sampler;
 
 const SAMPLE_WINDOW_SIZE: usize = 100;
 const SKIP_SIZE: usize = 25;
@@ -44,7 +46,7 @@ where
             base_label: format!("balter_{name}"),
             sampler: Sampler::new(scenario, goal_tps),
             cc: ConcurrencyController::new(goal_tps),
-            samples: SampleSet::new(SAMPLE_WINDOW_SIZE).skip_first_n(SKIP_SIZE),
+            samples: SampleSet::new(),
             needs_clear: false,
             tps_limited: false,
         };
@@ -230,8 +232,8 @@ where
 
         let data = SampleData {
             elapsed,
-            success_count,
-            error_count,
+            success: success_count,
+            error: error_count,
         };
 
         // TODO: We should adjust interval timing based on noise not just sample count.
@@ -349,7 +351,7 @@ mod tests {
         let mut tps_sampler = Sampler::new(mock_trivial_scenario, NonZeroU32::new(1_000).unwrap());
         tps_sampler.set_concurrency(20);
 
-        let mut samples = SampleSet::new(1);
+        let mut samples = SampleSet::new();
         tps_sampler.sample(&mut samples).await;
         for _ in 0..10 {
             tps_sampler.sample(&mut samples).await;
@@ -366,7 +368,7 @@ mod tests {
         let mut tps_sampler = Sampler::new(mock_noisy_scenario, NonZeroU32::new(1_000).unwrap());
         tps_sampler.set_concurrency(20);
 
-        let mut samples = SampleSet::new(1);
+        let mut samples = SampleSet::new();
         tps_sampler.sample(&mut samples).await;
         for _ in 0..10 {
             tps_sampler.sample(&mut samples).await;

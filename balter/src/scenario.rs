@@ -1,5 +1,7 @@
 //! Scenario logic and constants
 use crate::controllers::{CompositeController, Controller};
+use crate::hints::Hint;
+use crate::sampler::ConcurrentSampler;
 use balter_core::{LatencyConfig, RunStatistics, ScenarioConfig};
 #[cfg(feature = "rt")]
 use balter_runtime::runtime::{RuntimeMessage, BALTER_OUT};
@@ -12,10 +14,6 @@ use std::{
 };
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
-
-mod sampler;
-
-use sampler::ConcurrentSampler;
 
 /// Load test scenario structure
 ///
@@ -65,6 +63,7 @@ pub trait ConfigurableScenario<T: Send>: Future<Output = T> + Sized + Send {
     fn tps(self, tps: u32) -> Self;
     fn latency(self, latency: Duration, quantile: f64) -> Self;
     fn duration(self, duration: Duration) -> Self;
+    fn hint(self, hint: Hint) -> Self;
 }
 
 impl<T, F> ConfigurableScenario<RunStatistics> for Scenario<T>
@@ -193,6 +192,19 @@ where
     fn duration(mut self, duration: Duration) -> Self {
         self.config.duration = Some(duration);
         self
+    }
+
+    /// Apply a hint for how to run the Scenario
+    ///
+    /// By default Balter attempts to autoscale all parameters to find the optimal values for
+    /// various scenarios. However, this process can be slow due to the control loop processes
+    /// underneath (and the requirements to be adaptable to all sorts of timing
+    /// characteristics).
+    ///
+    /// This method allows providing hints to Balter to speed up finding optimal
+    /// parameters. See [Hint] for more information.
+    fn hint(mut self, hint: Hint) -> Self {
+        todo!()
     }
 }
 

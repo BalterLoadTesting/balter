@@ -1,4 +1,4 @@
-use balter_core::SampleSet;
+use crate::data::SampleSet;
 use std::num::NonZeroU32;
 #[allow(unused)]
 use tracing::{debug, error, trace};
@@ -174,20 +174,20 @@ struct Measurement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use balter_core::SampleData;
+    use crate::data::SampleData;
     use std::num::NonZeroU32;
     use std::time::Duration;
 
     pub fn generate_tps(count: usize, tps: u64) -> SampleSet {
-        let mut samples = SampleSet::new(count);
+        let mut samples = SampleSet::new();
 
         for _ in 0..count {
             let success_count = tps;
             let elapsed = Duration::from_secs(1);
 
             samples.push(SampleData {
-                success_count,
-                error_count: 0,
+                success: success_count,
+                error: 0,
                 elapsed,
             })
         }

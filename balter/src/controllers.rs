@@ -8,7 +8,8 @@ pub(crate) use constant::ConstantController;
 pub(crate) use error_rate::ErrorRateController;
 pub(crate) use latency::LatencyController;
 
-use balter_core::{LatencyConfig, SampleSet, ScenarioConfig};
+use crate::data::SampleSet;
+use balter_core::{LatencyConfig, ScenarioConfig};
 use std::num::NonZeroU32;
 
 pub(crate) trait Controller: Send {

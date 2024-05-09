@@ -1,4 +1,4 @@
-use crate::BASELINE_TPS;
+use crate::BASE_TPS;
 #[cfg(feature = "rt")]
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
@@ -50,7 +50,7 @@ impl ScenarioConfig {
             }
             | ScenarioConfig {
                 latency: Some(_), ..
-            } => Some(BASELINE_TPS),
+            } => Some(BASE_TPS),
 
             ScenarioConfig {
                 max_tps: Some(tps), ..

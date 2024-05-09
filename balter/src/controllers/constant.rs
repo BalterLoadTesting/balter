@@ -1,5 +1,5 @@
 use crate::controllers::Controller;
-use balter_core::SampleSet;
+use crate::data::SampleSet;
 use std::num::NonZeroU32;
 
 pub(crate) struct ConstantController {
