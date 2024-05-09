@@ -19,6 +19,7 @@ use tokio::time::{interval, Interval};
 use tracing::{debug, error, info, trace, warn};
 
 mod base_sampler;
+mod concurrency_adjusted_sampler;
 
 const SAMPLE_WINDOW_SIZE: usize = 100;
 const SKIP_SIZE: usize = 25;

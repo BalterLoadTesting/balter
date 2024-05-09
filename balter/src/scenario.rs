@@ -2,7 +2,7 @@
 use crate::controllers::{CompositeController, Controller};
 use crate::hints::Hint;
 use crate::sampler::ConcurrentSampler;
-use balter_core::{LatencyConfig, RunStatistics, ScenarioConfig};
+use balter_core::{HintConfig, LatencyConfig, RunStatistics, ScenarioConfig};
 #[cfg(feature = "rt")]
 use balter_runtime::runtime::{RuntimeMessage, BALTER_OUT};
 use std::{
@@ -204,7 +204,15 @@ where
     /// This method allows providing hints to Balter to speed up finding optimal
     /// parameters. See [Hint] for more information.
     fn hint(mut self, hint: Hint) -> Self {
-        todo!()
+        let mut hint_config = self.config.hints.unwrap_or(HintConfig::default());
+        match hint {
+            Hint::Concurrency(concurrency) => {
+                hint_config.concurrency = concurrency;
+            }
+        }
+
+        self.config.hints = Some(hint_config);
+        self
     }
 }
 

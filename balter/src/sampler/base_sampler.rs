@@ -18,7 +18,7 @@ use tokio::time::{interval, Instant, Interval};
 #[allow(unused)]
 use tracing::{debug, error, info, trace, warn};
 
-const SKIP_SIZE: usize = 3;
+const SKIP_SIZE: usize = 2;
 
 pub(crate) struct BaseSampler<T> {
     scenario: T,
@@ -51,8 +51,15 @@ where
             let per_sample_count = provisional.count();
 
             if per_sample_count < balter_core::MIN_SAMPLE_COUNT {
+                trace!("Not enough sample count. Found {per_sample_count}. Doubling.");
                 self.timer.double().await;
-                trace!("Not enough sample count. Found {per_sample_count}.");
+
+                // A tiny optimization to speed up sampling particularly in low-TPS or
+                // high-latency situations.
+                if self.concurrency() < 50 {
+                    self.set_concurrency(self.concurrency() * 2);
+                }
+
                 continue;
             }
 
@@ -97,6 +104,10 @@ where
         self.task_atomics.set_tps_limit(tps_limit);
     }
 
+    pub fn tps_limit(&self) -> NonZeroU32 {
+        self.task_atomics.tps_limit
+    }
+
     pub fn set_concurrency(&mut self, concurrency: usize) {
         if self.tasks.len() == concurrency {
             return;
@@ -121,6 +132,10 @@ where
                 )));
             }
         }
+    }
+
+    pub fn concurrency(&self) -> usize {
+        self.tasks.len()
     }
 
     pub async fn shutdown(mut self) {
@@ -262,10 +277,11 @@ fn is_decreasing(values: &[f64], count: usize) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use rand_distr::{Distribution, SkewNormal};
 
+    #[macro_export]
     macro_rules! mock_scenario {
         ($m:expr, $s:expr) => {
             || async {
@@ -278,7 +294,7 @@ mod tests {
                 let std: Duration = $s;
                 let _ = crate::transaction::transaction_hook::<_, (), ()>(labels, async {
                     let normal =
-                        SkewNormal::new(mean.as_secs_f64(), std.as_secs_f64(), 50.).unwrap();
+                        SkewNormal::new(mean.as_secs_f64(), std.as_secs_f64(), 20.).unwrap();
                     let v: f64 = normal.sample(&mut rand::thread_rng()).max(0.);
                     tokio::time::sleep(Duration::from_secs_f64(v)).await;
                     Ok(())
