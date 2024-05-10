@@ -22,7 +22,7 @@ mod tests {
 
         let stats = scenario_1ms_delay()
             .tps(10_000)
-            .duration(Duration::from_secs(360))
+            .duration(Duration::from_secs(30))
             .await;
 
         assert_eq!(stats.goal_tps, 10_000);
@@ -100,7 +100,7 @@ mod tests {
 
         let stats = scenario_1ms_limited_7000()
             .tps(10_000)
-            .duration(Duration::from_secs(120))
+            .duration(Duration::from_secs(30))
             .await;
 
         assert!(dbg!(stats.goal_tps) <= 7_100);

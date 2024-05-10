@@ -1,20 +1,7 @@
-use crate::data::{SampleData, SampleSet};
+use crate::data::SampleSet;
 use crate::sampler::base_sampler::BaseSampler;
-use crate::transaction::{TransactionData, TRANSACTION_HOOK};
-use arc_swap::ArcSwap;
-use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
-use metrics_util::AtomicBucket;
 use std::future::Future;
-use std::{
-    num::NonZeroU32,
-    sync::{
-        atomic::{AtomicU64, AtomicUsize, Ordering},
-        Arc,
-    },
-    time::{Duration, Instant},
-};
-use tokio::task::JoinHandle;
-use tokio::time::{interval, Interval};
+use std::num::NonZeroU32;
 #[allow(unused)]
 use tracing::{debug, error, info, trace, warn};
 
@@ -81,7 +68,7 @@ where
         self.sampler.tps_limit()
     }
 
-    pub fn shutdown(mut self) -> SamplerStats {
+    pub fn shutdown(self) -> SamplerStats {
         let concurrency = self.concurrency();
         let tps_limit = self.sampler.tps_limit();
         self.sampler.shutdown();
@@ -176,6 +163,7 @@ mod tests {
     use super::*;
     use crate::mock_scenario;
     use rand_distr::{Distribution, SkewNormal};
+    use std::time::Duration;
 
     #[tracing_test::traced_test]
     #[tokio::test]

@@ -1,4 +1,3 @@
-use crate::controllers::{CCOutcome, ConcurrencyController};
 use crate::data::{SampleData, SampleSet};
 use crate::transaction::{TransactionData, TRANSACTION_HOOK};
 use arc_swap::ArcSwap;
@@ -8,7 +7,7 @@ use std::future::Future;
 use std::{
     num::NonZeroU32,
     sync::{
-        atomic::{AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc,
     },
     time::Duration,
@@ -267,15 +266,6 @@ fn is_stable(values: &[f64], count: usize) -> bool {
     diffs.iter().rev().take_while(|x| **x < 0.02).count() >= count - 1
 }
 
-fn is_decreasing(values: &[f64], count: usize) -> bool {
-    values
-        .windows(2)
-        .rev()
-        .take(count - 1)
-        .map(|arr| arr[1] < arr[0])
-        .all(|x| x)
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -290,13 +280,13 @@ pub(crate) mod tests {
                     error: "",
                     latency: "",
                 };
-                let mean: Duration = $m;
-                let std: Duration = $s;
+                let mean: std::time::Duration = $m;
+                let std: std::time::Duration = $s;
                 let _ = crate::transaction::transaction_hook::<_, (), ()>(labels, async {
                     let normal =
                         SkewNormal::new(mean.as_secs_f64(), std.as_secs_f64(), 20.).unwrap();
                     let v: f64 = normal.sample(&mut rand::thread_rng()).max(0.);
-                    tokio::time::sleep(Duration::from_secs_f64(v)).await;
+                    tokio::time::sleep(std::time::Duration::from_secs_f64(v)).await;
                     Ok(())
                 })
                 .await;
@@ -361,20 +351,5 @@ pub(crate) mod tests {
         let arr = [9., 9., 9.8, 9.9, 10.];
         assert!(is_stable(&arr, 3));
         assert!(!is_stable(&arr, 4));
-    }
-
-    #[test]
-    #[tracing_test::traced_test]
-    fn test_is_decreasing_true() {
-        let arr = [10., 5., 8., 7., 6.];
-        assert!(is_decreasing(&arr, 3));
-        assert!(!is_decreasing(&arr, 4));
-    }
-
-    #[test]
-    fn test_is_decreasing_false() {
-        let arr = [10., 11., 8., 7., 9.];
-        assert!(!is_decreasing(&arr, 2));
-        assert!(!is_decreasing(&arr, 4));
     }
 }

@@ -28,10 +28,6 @@ impl SampleSet {
 
     /// Separate Latency push method since the TDigest datastructure does not support merge, and is
     /// probabilistic in nature.
-    pub fn push_latency(&mut self, latency: Duration) {
-        self.latency.insert(latency.as_secs_f64());
-    }
-
     pub fn push_latencies(&mut self, mut latencies: Vec<Duration>) {
         for latency in latencies.drain(..) {
             self.latency.insert(latency.as_secs_f64());
@@ -41,10 +37,6 @@ impl SampleSet {
     pub fn clear(&mut self) {
         self.samples.clear();
         self.latency = default_tdigest();
-    }
-
-    pub fn full(&self) -> bool {
-        self.samples.len() > 0
     }
 
     pub fn mean_err(&self) -> f64 {
@@ -57,6 +49,7 @@ impl SampleSet {
         sum / self.samples.len() as f64
     }
 
+    #[allow(unused)]
     pub fn var_tps(&self) -> f64 {
         let mean = self.mean_tps();
         self.samples

@@ -1,8 +1,8 @@
 //! Scenario logic and constants
 use crate::controllers::{CompositeController, Controller};
 use crate::hints::Hint;
-use crate::sampler::{ConcurrencyAdjustedSampler, ConcurrentSampler};
-use balter_core::{HintConfig, LatencyConfig, RunStatistics, ScenarioConfig};
+use crate::sampler::ConcurrencyAdjustedSampler;
+use balter_core::{LatencyConfig, RunStatistics, ScenarioConfig};
 #[cfg(feature = "rt")]
 use balter_runtime::runtime::{RuntimeMessage, BALTER_OUT};
 use std::{

@@ -1,9 +1,7 @@
-mod concurrency;
 mod constant;
 mod error_rate;
 mod latency;
 
-pub(crate) use concurrency::{CCOutcome, ConcurrencyController};
 pub(crate) use constant::ConstantController;
 pub(crate) use error_rate::ErrorRateController;
 pub(crate) use latency::LatencyController;
