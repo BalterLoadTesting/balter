@@ -1,7 +1,7 @@
 //! Scenario logic and constants
 use crate::controllers::{CompositeController, Controller};
 use crate::hints::Hint;
-use crate::sampler::ConcurrentSampler;
+use crate::sampler::{ConcurrencyAdjustedSampler, ConcurrentSampler};
 use balter_core::{HintConfig, LatencyConfig, RunStatistics, ScenarioConfig};
 #[cfg(feature = "rt")]
 use balter_runtime::runtime::{RuntimeMessage, BALTER_OUT};
@@ -204,14 +204,11 @@ where
     /// This method allows providing hints to Balter to speed up finding optimal
     /// parameters. See [Hint] for more information.
     fn hint(mut self, hint: Hint) -> Self {
-        let mut hint_config = self.config.hints.unwrap_or(HintConfig::default());
         match hint {
             Hint::Concurrency(concurrency) => {
-                hint_config.concurrency = concurrency;
+                self.config.hints.concurrency = concurrency;
             }
         }
-
-        self.config.hints = Some(hint_config);
         self
     }
 }
@@ -259,27 +256,31 @@ where
     let start = Instant::now();
 
     let mut controllers = CompositeController::new(&config);
-    let mut sampler = ConcurrentSampler::new(&config.name, scenario, controllers.initial_tps());
+    //let mut sampler = ConcurrentSampler::new(&config.name, scenario, controllers.initial_tps());
+    let mut sampler =
+        ConcurrencyAdjustedSampler::new(scenario, controllers.initial_tps(), config.concurrency())
+            .await;
 
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
-    loop {
-        if let (stable, Some(samples)) = sampler.get_samples().await {
-            // NOTE: We have our break-out inside this branch so that our final sampler_stats are
-            // accurate.
-            if let Some(duration) = config.duration {
-                if start.elapsed() > duration {
-                    break;
-                }
-            }
+    let final_sample_set = loop {
+        let (stable, samples) = sampler.sample().await;
 
-            let new_goal_tps = controllers.limit(samples, stable);
-
-            if new_goal_tps < sampler.goal_tps() || stable {
-                sampler.set_goal_tps(new_goal_tps);
+        // NOTE: We have our break-out inside this branch so that our final sampler_stats are
+        // accurate.
+        if let Some(duration) = config.duration {
+            if start.elapsed() > duration {
+                break samples;
             }
         }
-    }
-    let sampler_stats = sampler.wait_for_shutdown().await;
+
+        let new_goal_tps = controllers.limit(&samples, stable);
+
+        if new_goal_tps < sampler.tps_limit() || stable {
+            sampler.set_tps_limit(new_goal_tps);
+        }
+    };
+
+    let sampler_stats = sampler.shutdown();
 
     #[cfg(feature = "rt")]
     signal_completion().await;
@@ -288,12 +289,12 @@ where
 
     RunStatistics {
         concurrency: sampler_stats.concurrency,
-        goal_tps: sampler_stats.goal_tps.get(),
-        actual_tps: sampler_stats.final_sample_set.mean_tps(),
-        latency_p50: sampler_stats.final_sample_set.latency(0.5),
-        latency_p90: sampler_stats.final_sample_set.latency(0.9),
-        latency_p99: sampler_stats.final_sample_set.latency(0.99),
-        error_rate: sampler_stats.final_sample_set.mean_err(),
+        goal_tps: sampler_stats.tps_limit.get(),
+        actual_tps: final_sample_set.mean_tps(),
+        latency_p50: final_sample_set.latency(0.5),
+        latency_p90: final_sample_set.latency(0.9),
+        latency_p99: final_sample_set.latency(0.99),
+        error_rate: final_sample_set.mean_err(),
         tps_limited: sampler_stats.tps_limited,
     }
 }

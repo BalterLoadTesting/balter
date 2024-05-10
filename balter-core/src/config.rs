@@ -19,7 +19,7 @@ pub struct ScenarioConfig {
     pub max_tps: Option<NonZeroU32>,
     pub error_rate: Option<f64>,
     pub latency: Option<LatencyConfig>,
-    pub hints: Option<HintConfig>,
+    pub hints: HintConfig,
 }
 
 impl ScenarioConfig {
@@ -30,7 +30,7 @@ impl ScenarioConfig {
             max_tps: None,
             error_rate: None,
             latency: None,
-            hints: None,
+            hints: HintConfig::default(),
         }
     }
 
@@ -60,6 +60,10 @@ impl ScenarioConfig {
 
             _ => None,
         }
+    }
+
+    pub fn concurrency(&self) -> usize {
+        self.hints.concurrency
     }
 
     #[allow(unused)]
@@ -112,7 +116,7 @@ mod tests {
             max_tps: Some(NonZeroU32::new(2_000).unwrap()),
             error_rate: Some(0.03),
             latency: Some(LatencyConfig::new(Duration::from_millis(20), 0.99)),
-            hints: None,
+            hints: HintConfig::default(),
         });
     }
 }

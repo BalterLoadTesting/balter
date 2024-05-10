@@ -21,6 +21,8 @@ use tracing::{debug, error, info, trace, warn};
 mod base_sampler;
 mod concurrency_adjusted_sampler;
 
+pub(crate) use concurrency_adjusted_sampler::ConcurrencyAdjustedSampler;
+
 const SAMPLE_WINDOW_SIZE: usize = 100;
 const SKIP_SIZE: usize = 25;
 

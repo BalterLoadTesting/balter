@@ -77,7 +77,23 @@ where
         self.sampler.set_tps_limit(limit);
     }
 
-    fn concurrency(&self) -> usize {
+    pub fn tps_limit(&self) -> NonZeroU32 {
+        self.sampler.tps_limit()
+    }
+
+    pub fn shutdown(mut self) -> SamplerStats {
+        let concurrency = self.concurrency();
+        let tps_limit = self.sampler.tps_limit();
+        self.sampler.shutdown();
+
+        SamplerStats {
+            tps_limit,
+            concurrency,
+            tps_limited: self.tps_limited,
+        }
+    }
+
+    pub fn concurrency(&self) -> usize {
         self.sampler.concurrency()
     }
 
@@ -147,6 +163,12 @@ where
             None
         }
     }
+}
+
+pub(crate) struct SamplerStats {
+    pub tps_limit: NonZeroU32,
+    pub concurrency: usize,
+    pub tps_limited: bool,
 }
 
 #[cfg(test)]

@@ -138,7 +138,7 @@ where
         self.tasks.len()
     }
 
-    pub async fn shutdown(mut self) {
+    pub fn shutdown(mut self) {
         self.set_concurrency(0);
     }
 }
