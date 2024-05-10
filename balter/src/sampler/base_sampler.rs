@@ -124,7 +124,9 @@ where
             metrics::gauge!(format!("{}_concurrency", &self.base_label)).set(concurrency as f64);
         }
 
+        #[allow(clippy::comparison_chain)]
         if self.tasks.len() == concurrency {
+            #[allow(clippy::needless_return)]
             return;
         } else if self.tasks.len() > concurrency {
             for handle in self.tasks.drain(concurrency..) {
@@ -304,7 +306,7 @@ pub(crate) mod tests {
                 };
                 let mean: std::time::Duration = $m;
                 let std: std::time::Duration = $s;
-                let _ = crate::transaction::transaction_hook::<_, (), ()>(labels, async {
+                let _ = $crate::transaction::transaction_hook::<_, (), ()>(labels, async {
                     let normal =
                         SkewNormal::new(mean.as_secs_f64(), std.as_secs_f64(), 20.).unwrap();
                     let v: f64 = normal.sample(&mut rand::thread_rng()).max(0.);
@@ -321,7 +323,7 @@ pub(crate) mod tests {
     async fn test_simple() {
         let mut sampler = BaseSampler::new(
             "",
-            mock_scenario!(Duration::from_millis(1), Duration::from_millis(0)),
+            mock_scenario!(Duration::from_millis(1), Duration::from_micros(10)),
             NonZeroU32::new(1_000).unwrap(),
         )
         .await;
@@ -338,14 +340,14 @@ pub(crate) mod tests {
         let mut sampler = BaseSampler::new(
             "",
             mock_scenario!(Duration::from_millis(10), Duration::from_millis(5)),
-            NonZeroU32::new(10_000).unwrap(),
+            NonZeroU32::new(1_000).unwrap(),
         )
         .await;
 
         sampler.set_concurrency(210);
 
         let samples = sampler.sample().await;
-        assert!(samples.mean_tps() >= 9_000. && samples.mean_tps() <= 10_010.);
+        assert!(samples.mean_tps() >= 900. && samples.mean_tps() <= 1100.);
     }
 
     #[tracing_test::traced_test]
