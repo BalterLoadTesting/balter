@@ -1,8 +1,8 @@
 use std::num::NonZeroU32;
 use std::time::Duration;
 
-pub const BASE_TPS: NonZeroU32 = unsafe { NonZeroU32::new_unchecked(256) };
-pub const BASE_CONCURRENCY: usize = 4;
+pub const BASE_TPS: NonZeroU32 = unsafe { NonZeroU32::new_unchecked(512) };
+pub const BASE_CONCURRENCY: usize = 10;
 pub const BASE_INTERVAL: Duration = Duration::from_millis(200);
 
 pub const MIN_SAMPLE_COUNT: u64 = 256;

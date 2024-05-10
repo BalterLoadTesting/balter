@@ -257,9 +257,13 @@ where
 
     let mut controllers = CompositeController::new(&config);
     //let mut sampler = ConcurrentSampler::new(&config.name, scenario, controllers.initial_tps());
-    let mut sampler =
-        ConcurrencyAdjustedSampler::new(scenario, controllers.initial_tps(), config.concurrency())
-            .await;
+    let mut sampler = ConcurrencyAdjustedSampler::new(
+        &config.name,
+        scenario,
+        controllers.initial_tps(),
+        config.concurrency(),
+    )
+    .await;
 
     // NOTE: This loop is time-sensitive. Any long awaits or blocking will throw off measurements
     let final_sample_set = loop {

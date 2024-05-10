@@ -20,6 +20,7 @@ use tracing::{debug, error, info, trace, warn};
 const SKIP_SIZE: usize = 2;
 
 pub(crate) struct BaseSampler<T> {
+    base_label: String,
     scenario: T,
     tasks: Vec<JoinHandle<()>>,
     timer: Timer,
@@ -31,8 +32,9 @@ where
     T: Fn() -> F + Send + Sync + 'static + Clone,
     F: Future<Output = ()> + Send,
 {
-    pub async fn new(scenario: T, tps_limit: NonZeroU32) -> Self {
+    pub async fn new(name: &str, scenario: T, tps_limit: NonZeroU32) -> Self {
         Self {
+            base_label: format!("balter_{name}"),
             scenario,
             tasks: vec![],
             timer: Timer::new(balter_core::BASE_INTERVAL).await,
@@ -50,13 +52,19 @@ where
             let per_sample_count = provisional.count();
 
             if per_sample_count < balter_core::MIN_SAMPLE_COUNT {
-                trace!("Not enough sample count. Found {per_sample_count}. Doubling.");
-                self.timer.double().await;
+                trace!("Not enough sample count. Found {per_sample_count}.");
 
-                // A tiny optimization to speed up sampling particularly in low-TPS or
-                // high-latency situations.
+                // TODO: We can be far more clever about how to adjust these values. Based on the
+                // TPS per task and the goal TPS, we should be able to guess to a high degree the
+                // optimal sampling interval and concurrency.
+                // TODO: This also brings up the question of whether it makes sense to have a
+                // separate ConcurrencyAdjustedSampler, rather than smush it all in here...
                 if self.concurrency() < 50 {
                     self.set_concurrency(self.concurrency() * 2);
+                    trace!("Doubling concurrency to {}.", self.concurrency());
+                } else {
+                    self.timer.double().await;
+                    trace!("Doubling sampling interval to {}.", self.timer);
                 }
 
                 continue;
@@ -100,6 +108,10 @@ where
     }
 
     pub fn set_tps_limit(&mut self, tps_limit: NonZeroU32) {
+        if cfg!(feature = "metrics") {
+            metrics::gauge!(format!("{}_goal_tps", &self.base_label)).set(tps_limit.get());
+        }
+
         self.task_atomics.set_tps_limit(tps_limit);
     }
 
@@ -108,6 +120,10 @@ where
     }
 
     pub fn set_concurrency(&mut self, concurrency: usize) {
+        if cfg!(feature = "metrics") {
+            metrics::gauge!(format!("{}_concurrency", &self.base_label)).set(concurrency as f64);
+        }
+
         if self.tasks.len() == concurrency {
             return;
         } else if self.tasks.len() > concurrency {
@@ -180,6 +196,12 @@ impl Timer {
     async fn halve(&mut self) {
         self.interval_dur *= 2;
         *self = Self::new(self.interval_dur).await;
+    }
+}
+
+impl std::fmt::Display for Timer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", humantime::format_duration(self.interval_dur))
     }
 }
 
@@ -298,6 +320,7 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn test_simple() {
         let mut sampler = BaseSampler::new(
+            "",
             mock_scenario!(Duration::from_millis(1), Duration::from_millis(0)),
             NonZeroU32::new(1_000).unwrap(),
         )
@@ -313,6 +336,7 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn test_noisy() {
         let mut sampler = BaseSampler::new(
+            "",
             mock_scenario!(Duration::from_millis(10), Duration::from_millis(5)),
             NonZeroU32::new(10_000).unwrap(),
         )
@@ -328,6 +352,7 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn test_slow() {
         let mut sampler = BaseSampler::new(
+            "",
             mock_scenario!(Duration::from_millis(400), Duration::from_millis(100)),
             NonZeroU32::new(50).unwrap(),
         )

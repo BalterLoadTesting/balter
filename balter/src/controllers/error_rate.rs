@@ -96,11 +96,11 @@ impl Controller for ErrorRateController {
                         )
                     }
                     State::SmallStep(step_ratio) => {
-                        trace!("Over bounds w/ SmallStep.");
+                        trace!("Over bounds w/ SmallStep({step_ratio}).");
 
-                        let step = (self.goal_tps.get() as f64 * step_ratio).max(1.);
+                        let rev_goal = (self.goal_tps.get() as f64 / (step_ratio + 1.)).max(1.);
                         (
-                            NonZeroU32::new(self.goal_tps.get() - step as u32).unwrap(),
+                            NonZeroU32::new(rev_goal as u32).unwrap(),
                             State::SmallStep(step_ratio / 2.),
                         )
                     }

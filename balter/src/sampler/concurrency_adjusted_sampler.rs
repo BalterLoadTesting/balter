@@ -27,8 +27,8 @@ where
     T: Fn() -> F + Send + Sync + 'static + Clone,
     F: Future<Output = ()> + Send,
 {
-    pub async fn new(scenario: T, tps_limit: NonZeroU32, concurrency: usize) -> Self {
-        let mut sampler = BaseSampler::new(scenario, tps_limit).await;
+    pub async fn new(name: &str, scenario: T, tps_limit: NonZeroU32, concurrency: usize) -> Self {
+        let mut sampler = BaseSampler::new(name, scenario, tps_limit).await;
         sampler.set_concurrency(concurrency);
         Self {
             sampler,
@@ -169,6 +169,7 @@ mod tests {
     #[tokio::test]
     async fn test_simple() {
         let mut sampler = ConcurrencyAdjustedSampler::new(
+            "",
             mock_scenario!(Duration::from_millis(1), Duration::from_micros(10)),
             NonZeroU32::new(2_000).unwrap(),
             4,
