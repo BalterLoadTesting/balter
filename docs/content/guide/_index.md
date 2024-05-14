@@ -128,6 +128,19 @@ test_scaling_functionality()
     .await;
 ```
 
+### Hints
+
+For certain Scenarios it can be useful to provide hints for how Balter should run them. This is primarily useful for speeding up the control loops that Balter uses internally, which are designed to work for a wide variety of use-cases and can sometimes be slow. Currently Balter provides one kind of hint, the `Hint::Concurrency` which Balter will use as the starting concurrency for a given Scenario:
+
+```rust
+use balter::{prelude::*, Hint};
+
+my_scenario()
+    .tps(10_000)
+    .hint(Hint::Concurrency(100))
+    .await;
+```
+
 ## Statistics
 
 Scenario's will return statistical information about the run. For example,
