@@ -19,6 +19,7 @@ pub struct ScenarioConfig {
     pub max_tps: Option<NonZeroU32>,
     pub error_rate: Option<f64>,
     pub latency: Option<LatencyConfig>,
+    #[cfg_attr(feature = "rt", serde(default))]
     pub hints: HintConfig,
 }
 
