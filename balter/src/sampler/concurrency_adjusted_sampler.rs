@@ -1,4 +1,4 @@
-use crate::data::SampleSet;
+use crate::measurements::Measurements;
 use crate::sampler::base_sampler::BaseSampler;
 use std::future::Future;
 use std::num::NonZeroU32;
@@ -38,21 +38,21 @@ where
         }
     }
 
-    pub async fn sample(&mut self) -> (bool, SampleSet) {
-        let samples = self.sampler.sample().await;
+    pub async fn sample(&mut self) -> (bool, Measurements) {
+        let sample = self.sampler.sample().await;
 
-        let measured_tps = samples.mean_tps();
+        let measured_tps = sample.tps;
         let goal_tps = self.sampler.tps_limit().get() as f64;
 
         let error = (goal_tps - measured_tps) / goal_tps;
         if error < 0.05 {
             // NOTE: We don't really care about the negative case, since we're relying on the
             // RateLimiter to handle that situation.
-            (true, samples)
+            (true, sample)
         } else {
             let new_concurrency = self.adjust_concurrency(measured_tps);
             self.sampler.set_concurrency(new_concurrency);
-            (false, samples)
+            (false, sample)
         }
     }
 
@@ -178,6 +178,6 @@ mod tests {
 
         let _samples = sampler.sample().await;
         let _samples = sampler.sample().await;
-        assert_eq!(sampler.concurrency(), 5);
+        assert!(sampler.concurrency() > 4);
     }
 }

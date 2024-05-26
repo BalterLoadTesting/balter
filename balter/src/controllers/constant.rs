@@ -1,5 +1,5 @@
 use crate::controllers::Controller;
-use crate::data::SampleSet;
+use crate::measurements::Measurements;
 use std::num::NonZeroU32;
 
 pub(crate) struct ConstantController {
@@ -17,7 +17,7 @@ impl Controller for ConstantController {
         self.goal_tps
     }
 
-    fn limit(&mut self, _samples: &SampleSet, _stable: bool) -> NonZeroU32 {
+    fn limit(&mut self, _sample: &Measurements, _stable: bool) -> NonZeroU32 {
         self.goal_tps
     }
 }

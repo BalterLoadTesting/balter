@@ -1,5 +1,5 @@
 use crate::controllers::Controller;
-use crate::data::SampleSet;
+use crate::measurements::Measurements;
 use balter_core::BASE_TPS;
 use std::num::NonZeroU32;
 #[allow(unused_imports)]
@@ -47,9 +47,9 @@ impl Controller for ErrorRateController {
         BASE_TPS
     }
 
-    fn limit(&mut self, samples: &SampleSet, stable: bool) -> NonZeroU32 {
+    fn limit(&mut self, sample: &Measurements, stable: bool) -> NonZeroU32 {
         // TODO: Remove panic; this can be a type-safe check
-        let sample_error_rate = samples.mean_err();
+        let sample_error_rate = sample.error_rate;
 
         let (new_goal_tps, new_state) = match self.check_bounds(sample_error_rate) {
             Bounds::Under => match self.state {
@@ -76,8 +76,7 @@ impl Controller for ErrorRateController {
                     State::BigStep | State::SmallStep(_) => {
                         trace!("At bounds w/ BigStep|SmallStep.");
                         // TODO: Remove unwraps
-                        let samples_tps = samples.mean_tps();
-                        (convert_to_nonzerou32(samples_tps).unwrap(), State::Stable)
+                        (convert_to_nonzerou32(sample.tps).unwrap(), State::Stable)
                     }
                     s @ State::Stable => {
                         trace!("At bounds w/ Stable.");

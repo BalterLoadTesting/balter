@@ -6,13 +6,13 @@ pub(crate) use constant::ConstantController;
 pub(crate) use error_rate::ErrorRateController;
 pub(crate) use latency::LatencyController;
 
-use crate::data::SampleSet;
+use crate::measurements::Measurements;
 use balter_core::{LatencyConfig, ScenarioConfig};
 use std::num::NonZeroU32;
 
 pub(crate) trait Controller: Send {
     fn initial_tps(&self) -> NonZeroU32;
-    fn limit(&mut self, samples: &SampleSet, stable: bool) -> NonZeroU32;
+    fn limit(&mut self, sample: &Measurements, stable: bool) -> NonZeroU32;
 }
 
 pub(crate) struct CompositeController {
@@ -52,10 +52,10 @@ impl Controller for CompositeController {
             .expect("No controllers present.")
     }
 
-    fn limit(&mut self, samples: &SampleSet, stable: bool) -> NonZeroU32 {
+    fn limit(&mut self, sample: &Measurements, stable: bool) -> NonZeroU32 {
         self.controllers
             .iter_mut()
-            .map(|c| c.limit(samples, stable))
+            .map(|c| c.limit(sample, stable))
             .min()
             .expect("No controllers present.")
     }
