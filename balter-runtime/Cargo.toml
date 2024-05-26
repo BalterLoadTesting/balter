@@ -1,6 +1,6 @@
 [package]
 name = "balter-runtime"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 license = "MIT"
 authors = ["Byron Wasti <github@byronwasti.com>"]
@@ -12,7 +12,7 @@ categories = ["development-tools", "concurrency"]
 publish = true
 
 [dependencies]
-balter-core = { version = "0.3.0", features = ["rt"], path = "../balter-core" }
+balter-core = { version = "0.3.1", features = ["rt"], path = "../balter-core" }
 
 async-channel = "2.1.1"
 axum = { version = "0.7.2", features = ["macros", "ws", "tokio"] }

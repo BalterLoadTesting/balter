@@ -11,7 +11,7 @@ version EXECUTE='':
     cargo release version --exclude balter-tests --exclude mock-service --exclude examples minor {{EXECUTE}}
 
 publish EXECUTE='':
-    cargo release --exclude balter-tests --exclude mock-service --exclude examples {{EXECUTE}}
+    cargo release publish -p balter -p balter-macros -p balter-core -p balter-runtime {{EXECUTE}}
 
 integration TEST='':
     cargo test --release --features integration {{TEST}} -- --nocapture
