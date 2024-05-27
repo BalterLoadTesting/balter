@@ -60,12 +60,12 @@ mod tests {
         init().await;
 
         let stats = scenario_1ms_noisy_delay()
-            .tps(50)
+            .tps(500)
             .duration(Duration::from_secs(80))
             .await;
 
-        assert_eq!(stats.goal_tps, 50);
-        assert!(stats.actual_tps > 45.);
+        assert_eq!(stats.goal_tps, 500);
+        assert!(stats.actual_tps > 480.);
         assert!(stats.concurrency >= 10);
     }
 
@@ -114,7 +114,7 @@ mod tests {
 
         let stats = scenario_1ms_max_2000()
             .error_rate(0.03)
-            .duration(Duration::from_secs(360))
+            .duration(Duration::from_secs(60))
             .await;
 
         assert!(dbg!(stats.error_rate) > 0.0);

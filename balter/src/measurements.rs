@@ -1,4 +1,5 @@
 use pdatastructs::tdigest::{TDigest, K1};
+use std::fmt;
 use std::time::Duration;
 
 const TDIGEST_BACKLOG_SIZE: usize = 100;
@@ -32,6 +33,20 @@ impl Measurements {
     pub fn latency(&self, quantile: f64) -> Duration {
         let secs = self.latency.quantile(quantile);
         Duration::from_secs_f64(secs)
+    }
+}
+
+impl fmt::Display for Measurements {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "TPS={:.2}, ErrorRate={:.2}, p50={:?}, p90={:?}, p99={:?}",
+            self.tps,
+            self.error_rate,
+            self.latency(0.5),
+            self.latency(0.90),
+            self.latency(0.99),
+        )
     }
 }
 

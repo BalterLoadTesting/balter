@@ -42,7 +42,16 @@ where
 
     pub async fn sample(&mut self) -> Measurements {
         let elapsed = self.timer.tick().await;
-        self.task_atomics.collect(elapsed)
+        let measurements = self.task_atomics.collect(elapsed);
+
+        let latency_p50 = measurements.latency(0.5);
+        if latency_p50 > self.timer.interval_dur {
+            self.timer.set_interval_dur(latency_p50 * 2).await;
+        }
+
+        trace!("{measurements}");
+
+        measurements
     }
 
     pub fn set_tps_limit(&mut self, tps_limit: NonZeroU32) {
@@ -122,6 +131,14 @@ impl Timer {
         let elapsed = self.last_tick.elapsed();
         self.last_tick = next;
         elapsed
+    }
+
+    async fn set_interval_dur(&mut self, dur: Duration) {
+        if dur < Duration::from_secs(10) {
+            *self = Self::new(dur).await;
+        } else {
+            error!("Balter's polling interval is greater than 10s. This is likely a sign of an issue; not increasing the polling interval.")
+        }
     }
 
     #[allow(unused)]
@@ -274,6 +291,7 @@ pub(crate) mod tests {
 
         let _ = sampler.sample().await;
         let sample = sampler.sample().await;
+        dbg!(&sample);
         assert!(sample.tps >= 46. && sample.tps <= 51.);
     }
 }
