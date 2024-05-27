@@ -61,7 +61,7 @@ mod tests {
 
         let stats = scenario_1ms_noisy_delay()
             .tps(500)
-            .duration(Duration::from_secs(80))
+            .duration(Duration::from_secs(30))
             .await;
 
         assert_eq!(stats.goal_tps, 500);

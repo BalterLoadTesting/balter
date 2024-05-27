@@ -1,5 +1,5 @@
 use crate::controllers::Controller;
-use crate::measurements::Measurements;
+use crate::measurement::Measurement;
 use balter_core::BASE_TPS;
 use std::num::NonZeroU32;
 use std::time::Duration;
@@ -40,7 +40,7 @@ impl Controller for LatencyController {
         BASE_TPS
     }
 
-    fn limit(&mut self, sample: &Measurements, stable: bool) -> NonZeroU32 {
+    fn limit(&mut self, sample: &Measurement, stable: bool) -> NonZeroU32 {
         let measured_latency = sample.latency(self.quantile);
 
         trace!("LATENCY: Measured {measured_latency:?}");

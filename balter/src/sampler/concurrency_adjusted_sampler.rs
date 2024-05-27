@@ -1,4 +1,4 @@
-use crate::measurements::Measurements;
+use crate::measurement::Measurement;
 use crate::sampler::base_sampler::BaseSampler;
 use std::future::Future;
 use std::num::NonZeroU32;
@@ -38,7 +38,7 @@ where
         }
     }
 
-    pub async fn sample(&mut self) -> (bool, Measurements) {
+    pub async fn sample(&mut self) -> (bool, Measurement) {
         let sample = self.sampler.sample().await;
 
         let measured_tps = sample.tps;

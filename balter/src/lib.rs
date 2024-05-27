@@ -44,7 +44,7 @@ mod hints;
 pub mod macros;
 
 pub(crate) mod controllers;
-pub(crate) mod measurements;
+pub(crate) mod measurement;
 pub(crate) mod sampler;
 
 #[cfg(not(feature = "rt"))]

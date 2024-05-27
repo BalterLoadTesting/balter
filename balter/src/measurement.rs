@@ -4,15 +4,15 @@ use std::time::Duration;
 
 const TDIGEST_BACKLOG_SIZE: usize = 100;
 
-#[derive(Debug)]
-pub struct Measurements {
+#[derive(Debug, Clone)]
+pub struct Measurement {
     pub tps: f64,
     pub error_rate: f64,
     pub elapsed: Duration,
     latency: TDigest<K1>,
 }
 
-impl Measurements {
+impl Measurement {
     pub fn new(success: u64, error: u64, elapsed: Duration) -> Self {
         let tps = success as f64 / elapsed.as_secs_f64();
         let error_rate = error as f64 / (success + error) as f64;
@@ -36,7 +36,7 @@ impl Measurements {
     }
 }
 
-impl fmt::Display for Measurements {
+impl fmt::Display for Measurement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

@@ -1,7 +1,7 @@
 //! Scenario logic and constants
 use crate::controllers::{CompositeController, Controller};
 use crate::hints::Hint;
-use crate::sampler::ConcurrencyAdjustedSampler;
+use crate::sampler::Sampler;
 use balter_core::{LatencyConfig, RunStatistics, ScenarioConfig};
 #[cfg(feature = "rt")]
 use balter_runtime::runtime::{RuntimeMessage, BALTER_OUT};
@@ -257,7 +257,7 @@ where
 
     let mut controllers = CompositeController::new(&config);
     //let mut sampler = ConcurrentSampler::new(&config.name, scenario, controllers.initial_tps());
-    let mut sampler = ConcurrencyAdjustedSampler::new(
+    let mut sampler = Sampler::new(
         &config.name,
         scenario,
         controllers.initial_tps(),

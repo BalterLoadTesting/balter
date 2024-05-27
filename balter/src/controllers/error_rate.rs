@@ -1,5 +1,5 @@
 use crate::controllers::Controller;
-use crate::measurements::Measurements;
+use crate::measurement::Measurement;
 use balter_core::BASE_TPS;
 use std::num::NonZeroU32;
 #[allow(unused_imports)]
@@ -47,7 +47,7 @@ impl Controller for ErrorRateController {
         BASE_TPS
     }
 
-    fn limit(&mut self, sample: &Measurements, stable: bool) -> NonZeroU32 {
+    fn limit(&mut self, sample: &Measurement, stable: bool) -> NonZeroU32 {
         // TODO: Remove panic; this can be a type-safe check
         let sample_error_rate = sample.error_rate;
 
