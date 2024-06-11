@@ -114,7 +114,7 @@ mod tests {
 
         let stats = scenario_1ms_max_2000()
             .error_rate(0.03)
-            .duration(Duration::from_secs(60))
+            .duration(Duration::from_secs(90))
             .await;
 
         assert!(dbg!(stats.error_rate) > 0.0);

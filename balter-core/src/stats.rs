@@ -8,6 +8,7 @@ pub struct RunStatistics {
     pub actual_tps: f64,
     pub latency_p50: Duration,
     pub latency_p90: Duration,
+    pub latency_p95: Duration,
     pub latency_p99: Duration,
     pub error_rate: f64,
     pub tps_limited: bool,

@@ -297,6 +297,7 @@ where
         actual_tps: final_sample.tps,
         latency_p50: final_sample.latency(0.5),
         latency_p90: final_sample.latency(0.9),
+        latency_p95: final_sample.latency(0.95),
         latency_p99: final_sample.latency(0.99),
         error_rate: final_sample.error_rate,
         tps_limited: sampler_stats.tps_limited,
