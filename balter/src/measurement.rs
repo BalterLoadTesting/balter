@@ -4,6 +4,7 @@ use std::time::Duration;
 
 const TDIGEST_BACKLOG_SIZE: usize = 100;
 
+#[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct Measurement {
     pub tps: f64,
