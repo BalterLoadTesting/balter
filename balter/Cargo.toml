@@ -20,7 +20,7 @@ balter-runtime = { version = "0.2.4", path = "../balter-runtime", optional = tru
 arc-swap = "1.6.0"
 governor = "0.6.0"
 humantime = "2.1.0"
-metrics = { version = "0.22.3", optional = true }
+metrics = { version = "0.23", optional = true }
 metrics-util = "0.16.3"
 pdatastructs = "0.7.0"
 pin-project = "1.1.2"

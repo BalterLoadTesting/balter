@@ -10,7 +10,7 @@ publish = false
 tokio = { version = "1.29", features = ["full"] }
 balter = { path = "../balter" }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
-metrics = "0.22.0"
+metrics = "0.23.0"
 metrics-exporter-prometheus = "0.13.0"
 
 [profile.release]
