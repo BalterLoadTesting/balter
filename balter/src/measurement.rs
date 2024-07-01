@@ -1,6 +1,7 @@
 use pdatastructs::tdigest::{TDigest, K1};
 use std::fmt;
 use std::time::Duration;
+use tracing::error;
 
 const TDIGEST_BACKLOG_SIZE: usize = 100;
 
@@ -33,6 +34,15 @@ impl Measurement {
 
     pub fn latency(&self, quantile: f64) -> Duration {
         let secs = self.latency.quantile(quantile);
+
+        // TODO: Unfortunately TDigest sometimes returns NaN which we need to filter for.
+        let secs = if secs.is_finite() {
+            secs
+        } else {
+            error!("NaN Latency Calculation. This is a known bug in Balter.");
+            0.
+        };
+
         Duration::from_secs_f64(secs)
     }
 }
