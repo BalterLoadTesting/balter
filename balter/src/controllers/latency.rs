@@ -6,7 +6,7 @@ use std::time::Duration;
 #[allow(unused)]
 use tracing::{debug, error, trace};
 
-const KP: f64 = 0.9;
+const DEFAULT_KP: f64 = 0.9;
 
 #[allow(unused)]
 pub(crate) struct LatencyController {
@@ -14,15 +14,17 @@ pub(crate) struct LatencyController {
     latency: Duration,
     quantile: f64,
     goal_tps: NonZeroU32,
+    kp: f64,
 }
 
 impl LatencyController {
-    pub fn new(name: &str, latency: Duration, quantile: f64) -> Self {
+    pub fn new(name: &str, latency: Duration, quantile: f64, kp: Option<f64>) -> Self {
         let s = Self {
             base_label: format!("balter_{name}"),
             latency,
             quantile,
             goal_tps: BASE_TPS,
+            kp: kp.unwrap_or(DEFAULT_KP),
         };
         s.goal_tps_metric();
         s
@@ -49,7 +51,7 @@ impl Controller for LatencyController {
         let normalized_err = 1. - measured_latency.as_secs_f64() / self.latency.as_secs_f64();
         trace!("LATENCY: Error {normalized_err:?}");
 
-        let new_goal = self.goal_tps.get() as f64 * (1. + KP * normalized_err);
+        let new_goal = self.goal_tps.get() as f64 * (1. + self.kp * normalized_err);
         trace!("LATENCY: New Goal {new_goal:?}");
 
         if let Some(new_goal) = NonZeroU32::new(new_goal as u32) {

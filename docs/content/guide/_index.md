@@ -128,9 +128,11 @@ test_scaling_functionality()
     .await;
 ```
 
-### Hints
+## Hints
 
-For certain Scenarios it can be useful to provide hints for how Balter should run them. This is primarily useful for speeding up the control loops that Balter uses internally, which are designed to work for a wide variety of use-cases and can sometimes be slow. Currently Balter provides one kind of hint, the `Hint::Concurrency` which Balter will use as the starting concurrency for a given Scenario:
+For certain Scenarios it can be useful to provide hints for how Balter should run them. This is primarily useful for speeding up the control loops that Balter uses internally, which are designed to work for a wide variety of use-cases and can sometimes be slow. Currently Balter provides only a few hints.
+
+- `Hint::Concurrency` which Balter will use as the starting concurrency for a given Scenario:
 
 ```rust
 use balter::{prelude::*, Hint};
@@ -138,6 +140,28 @@ use balter::{prelude::*, Hint};
 my_scenario()
     .tps(10_000)
     .hint(Hint::Concurrency(100))
+    .await;
+```
+
+- `Hint::Tps` which Balter will use as the starting TPS for a given Scenario:
+
+```rust
+use balter::{prelude::*, Hint};
+
+my_scenario()
+    .tps(10_000)
+    .hint(Hint::Tps(10_000))
+    .await;
+```
+
+- `Hint::LatencyController` which sets the `Kp` value used by the proportional control loop in the Latency Controller. Use to speed up convergence, though beware of instability. Defaults to `0.9`.
+
+```rust
+use balter::{prelude::*, Hint};
+
+my_scenario()
+    .tps(10_000)
+    .hint(Hint::Latency(1.2))
     .await;
 ```
 

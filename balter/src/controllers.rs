@@ -17,6 +17,7 @@ pub(crate) trait Controller: Send {
 
 pub(crate) struct CompositeController {
     controllers: Vec<Box<dyn Controller>>,
+    starting_tps: Option<NonZeroU32>,
 }
 
 impl CompositeController {
@@ -36,20 +37,30 @@ impl CompositeController {
                 &config.name,
                 latency,
                 quantile,
+                config.hints.latency_controller,
             )));
         }
 
-        Self { controllers }
+        let starting_tps = config.hints.starting_tps;
+
+        Self {
+            controllers,
+            starting_tps,
+        }
     }
 }
 
 impl Controller for CompositeController {
     fn initial_tps(&self) -> NonZeroU32 {
-        self.controllers
-            .iter()
-            .map(|c| c.initial_tps())
-            .min()
-            .expect("No controllers present.")
+        if let Some(tps) = self.starting_tps {
+            tps
+        } else {
+            self.controllers
+                .iter()
+                .map(|c| c.initial_tps())
+                .min()
+                .expect("No controllers present.")
+        }
     }
 
     fn limit(&mut self, sample: &Measurement, stable: bool) -> NonZeroU32 {

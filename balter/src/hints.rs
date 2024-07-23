@@ -6,4 +6,11 @@ pub enum Hint {
     /// Provide the starting concurrency value. Useful for Scenarios with low TPS (which Balter can
     /// take a long time to stablize on).
     Concurrency(usize),
+
+    /// Starting TPS for Balter to use.
+    Tps(u32),
+
+    /// Kp value for the Latency Controller proportional control loop
+    /// Defaults to 0.9
+    LatencyController(f64),
 }

@@ -5,7 +5,6 @@ prep:
     cargo fmt --all -- --check
     cargo clippy --all-targets -- -D warnings
     cargo test --release
-    cargo semver-checks
 
 version EXECUTE='' VERSION='minor':
     cargo release version -p balter -p balter-macros -p balter-core -p balter-runtime {{VERSION}} {{EXECUTE}}

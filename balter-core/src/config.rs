@@ -95,12 +95,16 @@ impl LatencyConfig {
 #[cfg_attr(feature = "rt", derive(Serialize, Deserialize))]
 pub struct HintConfig {
     pub concurrency: usize,
+    pub starting_tps: Option<NonZeroU32>,
+    pub latency_controller: Option<f64>,
 }
 
 impl Default for HintConfig {
     fn default() -> Self {
         Self {
             concurrency: crate::BASE_CONCURRENCY,
+            starting_tps: None,
+            latency_controller: None,
         }
     }
 }

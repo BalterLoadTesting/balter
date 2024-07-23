@@ -208,6 +208,13 @@ where
             Hint::Concurrency(concurrency) => {
                 self.config.hints.concurrency = concurrency;
             }
+            Hint::Tps(tps) => {
+                self.config.hints.starting_tps =
+                    Some(NonZeroU32::new(tps).expect("TPS hint must be non-zero u32"));
+            }
+            Hint::LatencyController(kp) => {
+                self.config.hints.latency_controller = Some(kp);
+            }
         }
         self
     }

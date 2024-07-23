@@ -13,6 +13,8 @@ expression: "ScenarioConfig {\n    name: \"test_scenario\".to_string(),\n    dur
     "quantile": 0.99
   },
   "hints": {
-    "concurrency": 10
+    "concurrency": 10,
+    "starting_tps": null,
+    "latency_controller": null
   }
 }
