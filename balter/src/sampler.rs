@@ -126,11 +126,12 @@ where
             .push((self.sampler.concurrency(), stats.mean));
 
         let tps_per_task = stats.mean / self.sampler.concurrency() as f64;
-        let new_concurrency =
-            (self.sampler.tps_limit().get() as f64 / tps_per_task).ceil() as usize;
-        let new_concurrency = new_concurrency.max(self.sampler.concurrency()).max(1);
-
-        self.sampler.set_concurrency(new_concurrency);
+        let new_concurrency = (self.sampler.tps_limit().get() as f64 / tps_per_task).ceil();
+        //Make sure not infinity in case of division by zero (when mean is 0)
+        if new_concurrency.is_finite() {
+            let new_concurrency = (new_concurrency as usize).max(self.sampler.concurrency()).max(1);
+            self.sampler.set_concurrency(new_concurrency);
+        }
     }
 }
 
