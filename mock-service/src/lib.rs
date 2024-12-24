@@ -47,7 +47,7 @@ pub async fn run(addr: SocketAddr) {
     axum::serve(listener, app).await.unwrap();
 }
 
-/** New Handler **/
+/* New Handler */
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -206,7 +206,7 @@ async fn tps_updater_task() {
     }
 }
 
-/** Old Handlers **/
+/* Old Handlers */
 
 #[debug_handler]
 pub async fn delay(Path(delay_ms): Path<u64>) {
@@ -278,13 +278,13 @@ pub async fn limited(
     Ok(())
 }
 
-/** Utils **/
+/* Utils */
 
 pub fn rate_limiter(tps: u32) -> DefaultDirectRateLimiter {
     RateLimiter::direct(Quota::per_second(NonZeroU32::new(tps).unwrap()))
 }
 
-/** TPS Printer **/
+/* TPS Printer */
 
 static TPS_MEASURE: AtomicU64 = AtomicU64::new(0);
 

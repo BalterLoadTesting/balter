@@ -4,6 +4,7 @@
 //! - Boris Iglewicz and David Hoaglin (1993), "Volume 16: How to Detect and Handle Outliers",
 //!   The ASQC Basic References in Quality Control: Statistical Techniques, Edward F. Mykytka,
 //!   Ph.D., Editor.
+//!
 //! Shamelessly stolen from https://github.com/sharkdp/hyperfine/tree/master
 //!
 //! License:
