@@ -1,3 +1,6 @@
+default:
+    just --list
+
 build-release:
     cargo build --release
 

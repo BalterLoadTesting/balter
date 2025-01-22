@@ -263,7 +263,6 @@ where
     let start = Instant::now();
 
     let mut controllers = CompositeController::new(&config);
-    //let mut sampler = ConcurrentSampler::new(&config.name, scenario, controllers.initial_tps());
     let mut sampler = Sampler::new(
         &config.name,
         scenario,
